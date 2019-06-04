@@ -842,7 +842,7 @@ public class Countly {
      *                                  segmentation contains null or empty keys or values
      */
     public synchronized void recordEvent(final String key, final Map segmentation, final int count, final double sum) {
-        recordEvent(key, segmentation, count, sum, 0);
+        recordEvent(key, segmentation, count, sum, 0, 0);
     }
 
     /**
@@ -852,12 +852,13 @@ public class Countly {
      * @param count count to associate with the event, should be more than zero
      * @param sum sum to associate with the event
      * @param dur duration of an event
+     * @param timestamp timestamp of event (set to zero if should be set automatically)
      * @throws IllegalStateException if Countly SDK has not been initialized
      * @throws IllegalArgumentException if key is null or empty, count is less than 1, or if
      *                                  segmentation contains null or empty keys or values
      */
-    public synchronized void recordEvent(final String key, final Map segmentation, final int count, final double sum, final double dur){
-        recordEvent(key, segmentation, null, null, count, sum, dur);
+    public synchronized void recordEvent(final String key, final Map segmentation, final int count, final double sum, final double dur, final long timestamp){
+        recordEvent(key, segmentation, null, null, count, sum, dur, timestamp);
     }
 
     /**
@@ -867,11 +868,12 @@ public class Countly {
      * @param count count to associate with the event, should be more than zero
      * @param sum sum to associate with the event
      * @param dur duration of an event
+     * @param timestamp timestamp of event (set to zero if should be set automatically)
      * @throws IllegalStateException if Countly SDK has not been initialized
      * @throws IllegalArgumentException if key is null or empty, count is less than 1, or if
      *                                  segmentation contains null or empty keys or values
      */
-    public synchronized void recordEvent(final String key, final Map segmentation, final Map<String, Integer> segmentationInt, final Map<String, Double> segmentationDouble, final int count, final double sum, final double dur) {
+    public synchronized void recordEvent(final String key, final Map segmentation, final Map<String, Integer> segmentationInt, final Map<String, Double> segmentationDouble, final int count, final double sum, final double dur, final long timestamp) {
         if (!isInitialized()) {
             throw new IllegalStateException("Countly.sharedInstance().init must be called before recordEvent");
         }
@@ -922,19 +924,19 @@ public class Countly {
         switch (key) {
             case STAR_RATING_EVENT_KEY:
                 if (Countly.sharedInstance().getConsent(CountlyFeatureNames.starRating)) {
-                    eventQueue_.recordEvent(key, segmentation, segmentationInt, segmentationDouble, count, sum, dur);
+                    eventQueue_.recordEvent(key, segmentation, segmentationInt, segmentationDouble, count, sum, dur, timestamp);
                     sendEventsForced();
                 }
                 break;
             case VIEW_EVENT_KEY:
                 if (Countly.sharedInstance().getConsent(CountlyFeatureNames.views)) {
-                    eventQueue_.recordEvent(key, segmentation, segmentationInt, segmentationDouble, count, sum, dur);
+                    eventQueue_.recordEvent(key, segmentation, segmentationInt, segmentationDouble, count, sum, dur, timestamp);
                     sendEventsForced();
                 }
                 break;
             default:
                 if (Countly.sharedInstance().getConsent(CountlyFeatureNames.events)) {
-                    eventQueue_.recordEvent(key, segmentation, segmentationInt, segmentationDouble, count, sum, dur);
+                    eventQueue_.recordEvent(key, segmentation, segmentationInt, segmentationDouble, count, sum, dur, timestamp);
                     sendEventsIfNeeded();
                 }
                 break;

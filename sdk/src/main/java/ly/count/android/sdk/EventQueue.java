@@ -91,13 +91,15 @@ public class EventQueue {
      * @param count count associated with the custom event, should be more than zero
      * @param sum sum associated with the custom event, if not used, pass zero.
      *            NaN and infinity values will be quietly ignored.
+     * @param timestamp timestamp associated with the custom event, if should be set
+     *                  automatically, pass zero.
      * @throws IllegalArgumentException if key is null or empty
      */
-    void recordEvent(final String key, final Map segmentation, final Map<String, Integer> segmentationInt, final Map<String, Double> segmentationDouble, final int count, final double sum, final double dur) {
-        final long timestamp = Countly.currentTimestampMs();
+    void recordEvent(final String key, final Map segmentation, final Map<String, Integer> segmentationInt, final Map<String, Double> segmentationDouble, final int count, final double sum, final double dur, final long timestamp) {
+        final long eventTimestamp = timestamp > 0 ? timestamp : Countly.currentTimestampMs();
         final int hour = Countly.currentHour();
         final int dow = Countly.currentDayOfWeek();
-        countlyStore_.addEvent(key, segmentation, segmentationInt, segmentationDouble, timestamp, hour, dow, count, sum, dur);
+        countlyStore_.addEvent(key, segmentation, segmentationInt, segmentationDouble, eventTimestamp, hour, dow, count, sum, dur);
     }
 
     void recordEvent(final Event event) {
