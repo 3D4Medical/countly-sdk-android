@@ -1,6 +1,7 @@
 package ly.count.android.demo;
 
 import android.app.Activity;
+import android.content.res.Configuration;
 import android.os.Bundle;
 import android.view.View;
 
@@ -22,25 +23,25 @@ public class ActivityExampleCustomEvents extends Activity {
     }
 
     public void onClickRecordEvent01(View v) {
-        Countly.sharedInstance().recordEvent("Custom event 1");
+        Countly.sharedInstance().events().recordEvent("Custom event 1");
     }
 
     public void onClickRecordEvent02(View v) {
-        Countly.sharedInstance().recordEvent("Custom event 2", 3);
+        Countly.sharedInstance().events().recordEvent("Custom event 2", 3);
     }
 
     public void onClickRecordEvent03(View v) {
-        Countly.sharedInstance().recordEvent("Custom event 3", 1, 134);
+        Countly.sharedInstance().events().recordEvent("Custom event 3", 1, 134);
     }
 
     public void onClickRecordEvent04(View v) {
-        Countly.sharedInstance().recordEvent("Custom event 4", null, 1, 0, 55);
+        Countly.sharedInstance().events().recordEvent("Custom event 4", null, 1, 0, 55);
     }
 
     public void onClickRecordEvent05(View v) {
-        Map<String, String> segmentation = new HashMap<>();
+        Map<String, Object> segmentation = new HashMap<>();
         segmentation.put("wall", "green");
-        Countly.sharedInstance().recordEvent("Custom event 5", segmentation, 1, 0, 0);
+        Countly.sharedInstance().events().recordEvent("Custom event 5", segmentation, 1, 0, 0);
     }
 
     public void onClickRecordEvent06(View v) {
@@ -67,23 +68,30 @@ public class ActivityExampleCustomEvents extends Activity {
     }
 
     public void onClickRecordEvent08(View v) {
-        Map<String, String> segmentation = new HashMap<>();
+        Map<String, Object> segmentation = new HashMap<>();
         segmentation.put("wall", "yellow");
-        Countly.sharedInstance().recordEvent("Custom event 8", segmentation, 25, 10, 50);
+        Countly.sharedInstance().events().recordEvent("Custom event 8", segmentation, 25, 10, 50);
     }
 
     public void onClickRecordEvent09(View v) {
-        Countly.sharedInstance().startEvent("Custom event 9");
+        //start timed event
+        Countly.sharedInstance().events().recordEvent("Custom event 9");
     }
 
     public void onClickRecordEvent10(View v) {
-        Countly.sharedInstance().endEvent("Custom event 9");
+        //stop timed event
+        Countly.sharedInstance().events().recordEvent("Custom event 9");
+    }
+
+    public void onClickRecordEvent12(View v) {
+        //cancel timed event
+        Countly.sharedInstance().events().cancelEvent("Custom event 9");
     }
 
     public void onClickRecordEvent11(View v) {
-        Map<String, String> segmentation = new HashMap<>();
+        Map<String, Object> segmentation = new HashMap<>();
         segmentation.put("wall", "orange");
-        Countly.sharedInstance().endEvent("Custom event 9", segmentation, 4, 34);
+        Countly.sharedInstance().events().recordEvent("Custom event 9", segmentation, 4, 34);
     }
 
     @Override
@@ -98,5 +106,11 @@ public class ActivityExampleCustomEvents extends Activity {
     {
         Countly.sharedInstance().onStop();
         super.onStop();
+    }
+
+    @Override
+    public void onConfigurationChanged (Configuration newConfig){
+        super.onConfigurationChanged(newConfig);
+        Countly.sharedInstance().onConfigurationChanged(newConfig);
     }
 }

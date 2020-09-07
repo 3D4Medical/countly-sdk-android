@@ -6,21 +6,21 @@ buildscript {
         jcenter()
     }
     dependencies {
-        classpath 'com.novoda:bintray-release:0.9'
+        classpath 'com.novoda:bintray-release:0.9.1'
     }
 }
 
 android {
-    compileSdkVersion 28
+    compileSdkVersion 29
 
 
     defaultConfig {
-        minSdkVersion 15
-        targetSdkVersion 28
+        minSdkVersion 17
+        targetSdkVersion 29
         versionCode 1
-        versionName "19.02.3"
+        versionName "20.04.5"
 
-        testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
     }
 
@@ -38,8 +38,8 @@ dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
 
     testImplementation 'junit:junit:4.12'
-    androidTestImplementation 'com.android.support.test:runner:1.0.2'
-    androidTestImplementation 'com.android.support.test.espresso:espresso-core:3.0.2'
+    androidTestImplementation 'androidx.test:runner:1.2.0'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.2.0'
 }
 
 task copyLibs(type: Copy) {
@@ -57,7 +57,7 @@ publish {
     userOrg = 'countly'
     groupId = 'ly.count.android'
     artifactId = 'sdk-native'
-    publishVersion = '19.02.3'
+    publishVersion = '20.04.5'
     desc = 'Countly Android Native Crash Support'
     website = 'https://github.com/Countly/countly-sdk-android'
     autoPublish = false

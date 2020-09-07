@@ -52,6 +52,7 @@ class Event {
     public Map segmentation;
     public Map<String, Integer> segmentationInt;
     public Map<String, Double> segmentationDouble;
+    public Map<String, Boolean> segmentationBoolean;
     public int count;
     public double sum;
     public double dur;
@@ -59,17 +60,21 @@ class Event {
     public int hour;
     public int dow;
 
-    Event () {}
+    Event() {
+    }
 
-    public Event (String key) {
+    Event(String key) {
+        UtilsTime.Instant instant = UtilsTime.getCurrentInstant();
+
         this.key = key;
-        this.timestamp = Countly.currentTimestampMs();
-        this.hour = Countly.currentHour();
-        this.dow = Countly.currentDayOfWeek();
+        this.timestamp = instant.timestampMs;
+        this.hour = instant.hour;
+        this.dow = instant.dow;
     }
 
     /**
      * Creates and returns a JSONObject containing the event data from this object.
+     *
      * @return a JSONObject containing the event data from this object
      */
     JSONObject toJSON() {
@@ -87,19 +92,25 @@ class Event {
                 jobj = JSONUtils.serializeMap(segmentation);
             }
 
-            if(segmentationInt != null){
+            if (segmentationInt != null) {
                 for (Map.Entry<String, Integer> pair : segmentationInt.entrySet()) {
                     jobj.put(pair.getKey(), pair.getValue());
                 }
             }
 
-            if(segmentationDouble != null){
+            if (segmentationDouble != null) {
                 for (Map.Entry<String, Double> pair : segmentationDouble.entrySet()) {
                     jobj.put(pair.getKey(), pair.getValue());
                 }
             }
 
-            if(segmentation != null || segmentationInt != null || segmentationDouble != null) {
+            if (segmentationBoolean != null) {
+                for (Map.Entry<String, Boolean> pair : segmentationBoolean.entrySet()) {
+                    jobj.put(pair.getKey(), pair.getValue());
+                }
+            }
+
+            if (segmentation != null || segmentationInt != null || segmentationDouble != null || segmentationBoolean != null) {
                 json.put(SEGMENTATION_KEY, jobj);
             }
 
@@ -111,8 +122,7 @@ class Event {
             if (dur > 0) {
                 json.put(DUR_KEY, dur);
             }
-        }
-        catch (JSONException e) {
+        } catch (JSONException e) {
             if (Countly.sharedInstance().isLoggingEnabled()) {
                 Log.w(Countly.TAG, "Got exception converting an Event to JSON", e);
             }
@@ -123,9 +133,10 @@ class Event {
 
     /**
      * Factory method to create an Event from its JSON representation.
+     *
      * @param json JSON object to extract event data from
      * @return Event object built from the data in the JSON or null if the "key" value is not
-     *         present or the empty string, or if a JSON exception occurs
+     * present or the empty string, or if a JSON exception occurs
      * @throws NullPointerException if JSONObject is null
      */
     static Event fromJSON(final JSONObject json) {
@@ -148,6 +159,7 @@ class Event {
                 final HashMap<String, String> segmentation = new HashMap<>();
                 final HashMap<String, Integer> segmentationInt = new HashMap<>();
                 final HashMap<String, Double> segmentationDouble = new HashMap<>();
+                final HashMap<String, Boolean> segmentationBoolean = new HashMap<>();
 
                 final Iterator nameItr = segm.keys();
                 while (nameItr.hasNext()) {
@@ -155,12 +167,15 @@ class Event {
                     if (!segm.isNull(key)) {
                         Object obj = segm.opt(key);
 
-                        if(obj instanceof Double){
+                        if (obj instanceof Double) {
                             //in case it's a double
                             segmentationDouble.put(key, segm.getDouble(key));
-                        } else if(obj instanceof Integer){
+                        } else if (obj instanceof Integer) {
                             //in case it's a integer
                             segmentationInt.put(key, segm.getInt(key));
+                        } else if (obj instanceof Boolean) {
+                            //in case it's a boolean
+                            segmentationBoolean.put(key, segm.getBoolean(key));
                         } else {
                             //assume it's String
                             segmentation.put(key, segm.getString(key));
@@ -170,9 +185,9 @@ class Event {
                 event.segmentation = segmentation;
                 event.segmentationDouble = segmentationDouble;
                 event.segmentationInt = segmentationInt;
+                event.segmentationBoolean = segmentationBoolean;
             }
-        }
-        catch (JSONException e) {
+        } catch (JSONException e) {
             if (Countly.sharedInstance().isLoggingEnabled()) {
                 Log.w(Countly.TAG, "Got exception converting JSON to an Event", e);
             }
@@ -191,16 +206,16 @@ class Event {
         final Event e = (Event) o;
 
         return (key == null ? e.key == null : key.equals(e.key)) &&
-               timestamp == e.timestamp &&
-               hour == e.hour &&
-               dow == e.dow &&
-               (segmentation == null ? e.segmentation == null : segmentation.equals(e.segmentation));
+            timestamp == e.timestamp &&
+            hour == e.hour &&
+            dow == e.dow &&
+            (segmentation == null ? e.segmentation == null : segmentation.equals(e.segmentation));
     }
 
     @Override
     public int hashCode() {
         return (key != null ? key.hashCode() : 1) ^
-               (segmentation != null ? segmentation.hashCode() : 1) ^
-               (timestamp != 0 ? (int)timestamp : 1);
+            (segmentation != null ? segmentation.hashCode() : 1) ^
+            (timestamp != 0 ? (int) timestamp : 1);
     }
 }

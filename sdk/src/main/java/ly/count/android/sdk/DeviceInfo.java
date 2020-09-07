@@ -29,6 +29,7 @@ import android.util.Log;
 import android.view.Display;
 import android.view.WindowManager;
 
+import java.util.Map;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -74,6 +75,7 @@ class DeviceInfo {
     /**
      * Returns the non-scaled pixel resolution of the current default display being used by the
      * WindowManager in the specified context.
+     *
      * @param context context to use to retrieve the current WindowManager
      * @return a string in the format "WxH", or the empty string "" if resolution cannot be determined
      */
@@ -88,10 +90,9 @@ class DeviceInfo {
             final DisplayMetrics metrics = new DisplayMetrics();
             display.getMetrics(metrics);
             resolution = metrics.widthPixels + "x" + metrics.heightPixels;
-        }
-        catch (Throwable t) {
+        } catch (Throwable t) {
             if (Countly.sharedInstance().isLoggingEnabled()) {
-                Log.i(Countly.TAG, "Device resolution cannot be determined");
+                Log.i(Countly.TAG, "[DeviceInfo] Device resolution cannot be determined");
             }
         }
         return resolution;
@@ -99,9 +100,10 @@ class DeviceInfo {
 
     /**
      * Maps the current display density to a string constant.
+     *
      * @param context context to use to retrieve the current display metrics
      * @return a string constant representing the current display density, or the
-     *         empty string if the density is unknown
+     * empty string if the density is unknown
      */
     static String getDensity(final Context context) {
         String densityStr;
@@ -120,35 +122,19 @@ class DeviceInfo {
                 densityStr = "HDPI";
                 break;
             case DisplayMetrics.DENSITY_260:
-                densityStr = "XHDPI";
-                break;
             case DisplayMetrics.DENSITY_280:
-                densityStr = "XHDPI";
-                break;
             case DisplayMetrics.DENSITY_300:
-                densityStr = "XHDPI";
-                break;
             case DisplayMetrics.DENSITY_XHIGH:
                 densityStr = "XHDPI";
                 break;
             case DisplayMetrics.DENSITY_340:
-                densityStr = "XXHDPI";
-                break;
             case DisplayMetrics.DENSITY_360:
-                densityStr = "XXHDPI";
-                break;
             case DisplayMetrics.DENSITY_400:
-                densityStr = "XXHDPI";
-                break;
             case DisplayMetrics.DENSITY_420:
-                densityStr = "XXHDPI";
-                break;
             case DisplayMetrics.DENSITY_XXHIGH:
                 densityStr = "XXHDPI";
                 break;
             case DisplayMetrics.DENSITY_560:
-                densityStr = "XXXHDPI";
-                break;
             case DisplayMetrics.DENSITY_XXXHIGH:
                 densityStr = "XXXHDPI";
                 break;
@@ -162,9 +148,10 @@ class DeviceInfo {
     /**
      * Returns the display name of the current network operator from the
      * TelephonyManager from the specified context.
+     *
      * @param context context to use to retrieve the TelephonyManager from
      * @return the display name of the current network operator, or the empty
-     *         string if it cannot be accessed or determined
+     * string if it cannot be accessed or determined
      */
     static String getCarrier(final Context context) {
         String carrier = "";
@@ -175,7 +162,7 @@ class DeviceInfo {
         if (carrier == null || carrier.length() == 0) {
             carrier = "";
             if (Countly.sharedInstance().isLoggingEnabled()) {
-                Log.i(Countly.TAG, "No carrier found");
+                Log.i(Countly.TAG, "[DeviceInfo] No carrier found");
             }
         }
         return carrier;
@@ -201,11 +188,13 @@ class DeviceInfo {
     static String getAppVersion(final Context context) {
         String result = Countly.DEFAULT_APP_VERSION;
         try {
-            result = context.getPackageManager().getPackageInfo(context.getPackageName(), 0).versionName;
-        }
-        catch (PackageManager.NameNotFoundException e) {
+            String tmpVersion = context.getPackageManager().getPackageInfo(context.getPackageName(), 0).versionName;
+            if (tmpVersion != null) {
+                result = tmpVersion;
+            }
+        } catch (PackageManager.NameNotFoundException e) {
             if (Countly.sharedInstance().isLoggingEnabled()) {
-                Log.i(Countly.TAG, "No app version found");
+                Log.i(Countly.TAG, "[DeviceInfo] No app version found");
             }
         }
         return result;
@@ -220,13 +209,13 @@ class DeviceInfo {
             result = context.getPackageManager().getInstallerPackageName(context.getPackageName());
         } catch (Exception e) {
             if (Countly.sharedInstance().isLoggingEnabled()) {
-                Log.i(Countly.TAG, "Can't get Installer package [getStore]");
+                Log.d(Countly.TAG, "[DeviceInfo, getStore] Can't get Installer package ");
             }
         }
         if (result == null || result.length() == 0) {
             result = "";
             if (Countly.sharedInstance().isLoggingEnabled()) {
-                Log.i(Countly.TAG, "No store found [getStore]");
+                Log.d(Countly.TAG, "[DeviceInfo, getStore] No store found");
             }
         }
         return result;
@@ -238,20 +227,47 @@ class DeviceInfo {
      * See the following link for more info:
      * https://count.ly/resources/reference/server-api
      */
-    static String getMetrics(final Context context) {
+    static String getMetrics(final Context context, final Map<String, String> metricOverride) {
         final JSONObject json = new JSONObject();
 
         fillJSONIfValuesNotEmpty(json,
-                "_device", getDevice(),
-                "_os", getOS(),
-                "_os_version", getOSVersion(),
-                "_carrier", getCarrier(context),
-                "_resolution", getResolution(context),
-                "_density", getDensity(context),
-                "_locale", getLocale(),
-                "_app_version", getAppVersion(context),
-                "_store", getStore(context),
-                "_deep_link", deepLink);
+            "_device", getDevice(),
+            "_os", getOS(),
+            "_os_version", getOSVersion(),
+            "_carrier", getCarrier(context),
+            "_resolution", getResolution(context),
+            "_density", getDensity(context),
+            "_locale", getLocale(),
+            "_app_version", getAppVersion(context),
+            "_store", getStore(context),
+            "_deep_link", deepLink);
+
+        //override metric values
+        if(metricOverride != null) {
+            for (String k : metricOverride.keySet()) {
+                if (k == null || k.length() == 0) {
+                    if(Countly.sharedInstance().isLoggingEnabled()){
+                        Log.w(Countly.TAG, "Provided metric override key can't be null or empty");
+                    }
+                    continue;
+                }
+
+                String overrideValue = metricOverride.get(k);
+
+                if (overrideValue == null) {
+                    if(Countly.sharedInstance().isLoggingEnabled()){
+                        Log.w(Countly.TAG, "Provided metric override value can't be null, key:[" + k + "]");
+                    }
+                    continue;
+                }
+
+                try {
+                    json.put(k, overrideValue);
+                } catch (Exception ex){
+                    Log.e(Countly.TAG, "Could not set metric override, [" + ex + "]");
+                }
+            }
+        }
 
         String result = json.toString();
 
@@ -267,10 +283,11 @@ class DeviceInfo {
     /**
      * Utility method to fill JSONObject with supplied objects for supplied keys.
      * Fills json only with non-null and non-empty key/value pairs.
+     *
      * @param json JSONObject to fill
      * @param objects varargs of this kind: key1, value1, key2, value2, ...
      */
-    static void fillJSONIfValuesNotEmpty(final JSONObject json, final String ... objects) {
+    static void fillJSONIfValuesNotEmpty(final JSONObject json, final String... objects) {
         try {
             if (objects.length > 0 && objects.length % 2 == 0) {
                 for (int i = 0; i < objects.length; i += 2) {

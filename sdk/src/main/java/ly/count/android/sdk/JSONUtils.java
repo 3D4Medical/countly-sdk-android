@@ -80,6 +80,7 @@ class JSONUtils {
                         break;
                     case "long":
                         json.put((long)value);
+                        break;
                     case "double":
                         json.put((double)value);
                         break;

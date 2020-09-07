@@ -24,6 +24,7 @@ package ly.count.android.sdk;
 import android.content.Context;
 import android.content.SharedPreferences;
 
+import android.util.Log;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -46,32 +47,37 @@ import java.util.Map;
  * submits data to a Countly server, and it writes to this store as well.
  *
  * NOTE: This class is only public to facilitate unit testing, because
- *       of this bug in dexmaker: https://code.google.com/p/dexmaker/issues/detail?id=34
+ * of this bug in dexmaker: https://code.google.com/p/dexmaker/issues/detail?id=34
  */
 public class CountlyStore {
     private static final String PREFERENCES = "COUNTLY_STORE";
-    private static final String PREFERENCES_GCM = "ly.count.android.api.messaging";
+    private static final String PREFERENCES_PUSH = "ly.count.android.api.messaging";
     private static final String DELIMITER = ":::";
     private static final String CONNECTIONS_PREFERENCE = "CONNECTIONS";
     private static final String EVENTS_PREFERENCE = "EVENTS";
     private static final String LOCATION_CITY_PREFERENCE = "LOCATION_CITY";
     private static final String LOCATION_COUNTRY_CODE_PREFERENCE = "LOCATION_COUNTRY_CODE";
     private static final String LOCATION_IP_ADDRESS_PREFERENCE = "LOCATION_IP_ADDRESS";
-    private static final String LOCATION_PREFERENCE = "LOCATION";
+    private static final String LOCATION_GPS_PREFERENCE = "LOCATION";
     private static final String LOCATION_DISABLED_PREFERENCE = "LOCATION_DISABLED";
     private static final String STAR_RATING_PREFERENCE = "STAR_RATING";
     private static final String CACHED_ADVERTISING_ID = "ADVERTISING_ID";
     private static final String REMOTE_CONFIG_VALUES = "REMOTE_CONFIG";
+    private static final String CACHED_PUSH_ACTION_ID = "PUSH_ACTION_ID";
+    private static final String CACHED_PUSH_ACTION_INDEX = "PUSH_ACTION_INDEX";
+    private static final String CACHED_PUSH_MESSAGING_MODE = "PUSH_MESSAGING_MODE";
+    private static final String CACHED_PUSH_MESSAGING_PROVIDER = "PUSH_MESSAGING_PROVIDER";
     private static final int MAX_EVENTS = 100;
     private static final int MAX_REQUESTS = 1000;
 
     private final SharedPreferences preferences_;
-    private final SharedPreferences preferencesGCM_;
+    private final SharedPreferences preferencesPush_;
 
     private static final String CONSENT_GCM_PREFERENCES = "ly.count.android.api.messaging.consent.gcm";
 
     /**
      * Constructs a CountlyStore object.
+     *
      * @param context used to retrieve storage meta data, must not be null.
      * @throws IllegalArgumentException if context is null
      */
@@ -80,7 +86,11 @@ public class CountlyStore {
             throw new IllegalArgumentException("must provide valid context");
         }
         preferences_ = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE);
-        preferencesGCM_ = context.getSharedPreferences(PREFERENCES_GCM, Context.MODE_PRIVATE);
+        preferencesPush_ = createPreferencesPush(context);
+    }
+
+    static SharedPreferences createPreferencesPush(Context context) {
+        return context.getSharedPreferences(PREFERENCES_PUSH, Context.MODE_PRIVATE);
     }
 
     /**
@@ -120,7 +130,7 @@ public class CountlyStore {
         Collections.sort(events, new Comparator<Event>() {
             @Override
             public int compare(final Event e1, final Event e2) {
-                return (int)(e1.timestamp - e2.timestamp);
+                return (int) (e1.timestamp - e2.timestamp);
             }
         });
         return events;
@@ -135,22 +145,39 @@ public class CountlyStore {
 
     /**
      * Adds a connection to the local store.
+     *
      * @param str the connection to be added, ignored if null or empty
      */
     public synchronized void addConnection(final String str) {
         if (str != null && str.length() > 0) {
             final List<String> connections = new ArrayList<>(Arrays.asList(connections()));
             if (connections.size() < MAX_REQUESTS) {
+                //request under max requests, add as normal
                 connections.add(str);
                 preferences_.edit().putString(CONNECTIONS_PREFERENCE, join(connections, DELIMITER)).apply();
+            } else {
+                //reached the limit, start deleting oldest requests
+                if (Countly.sharedInstance().isLoggingEnabled()) {
+                    Log.w(Countly.TAG, "[CountlyStore] Store reached it's limit, deleting oldest request");
+                }
+
+                deleteOldestRequest();
+                addConnection(str);
             }
         }
     }
 
+    private synchronized void deleteOldestRequest(){
+        final List<String> connections = new ArrayList<>(Arrays.asList(connections()));
+        connections.remove(0);
+        preferences_.edit().putString(CONNECTIONS_PREFERENCE, join(connections, DELIMITER)).apply();
+    }
+
     /**
      * Removes a connection from the local store.
+     *
      * @param str the connection to be removed, ignored if null or empty,
-     *            or if a matching connection cannot be found
+     * or if a matching connection cannot be found
      */
     public synchronized void removeConnection(final String str) {
         if (str != null && str.length() > 0) {
@@ -161,8 +188,16 @@ public class CountlyStore {
         }
     }
 
+    protected synchronized void replaceConnections(final String[] newConns) {
+        if (newConns != null) {
+            final List<String> connections = new ArrayList<>(Arrays.asList(newConns));
+            preferences_.edit().putString(CONNECTIONS_PREFERENCE, join(connections, DELIMITER)).apply();
+        }
+    }
+
     /**
      * Adds a custom event to the local store.
+     *
      * @param event event to be added to the local store, must not be null
      */
     void addEvent(final Event event) {
@@ -176,8 +211,8 @@ public class CountlyStore {
     /**
      * Sets location of user and sends it with next request
      */
-    void setLocation(final String latLonCoordinates) {
-        preferences_.edit().putString(LOCATION_PREFERENCE, latLonCoordinates).apply();
+    void setLocationGpsCoordinates(final String latLonCoordinates) {
+        preferences_.edit().putString(LOCATION_GPS_PREFERENCE, latLonCoordinates).apply();
     }
 
     void setLocationCity(final String city) {
@@ -200,19 +235,19 @@ public class CountlyStore {
      * Get location or empty string in case if no location is specified
      */
     String getLocation() {
-        return preferences_.getString(LOCATION_PREFERENCE, "");
+        return preferences_.getString(LOCATION_GPS_PREFERENCE, null);
     }
 
     String getLocationCity() {
-        return preferences_.getString(LOCATION_CITY_PREFERENCE, "");
+        return preferences_.getString(LOCATION_CITY_PREFERENCE, null);
     }
 
     String getLocationCountryCode() {
-        return preferences_.getString(LOCATION_COUNTRY_CODE_PREFERENCE, "");
+        return preferences_.getString(LOCATION_COUNTRY_CODE_PREFERENCE, null);
     }
 
     String getLocationIpAddress() {
-        return preferences_.getString(LOCATION_IP_ADDRESS_PREFERENCE, "");
+        return preferences_.getString(LOCATION_IP_ADDRESS_PREFERENCE, null);
     }
 
     boolean getLocationDisabled() {
@@ -233,14 +268,13 @@ public class CountlyStore {
         return preferences_.getString(STAR_RATING_PREFERENCE, "");
     }
 
-    void setRemoteConfigValues(String values){
+    void setRemoteConfigValues(String values) {
         preferences_.edit().putString(REMOTE_CONFIG_VALUES, values).apply();
     }
 
-    String getRemoteConfigValues(){
+    String getRemoteConfigValues() {
         return preferences_.getString(REMOTE_CONFIG_VALUES, "");
     }
-
 
     void setCachedAdvertisingId(String advertisingId) {
         preferences_.edit().putString(CACHED_ADVERTISING_ID, advertisingId).apply();
@@ -250,16 +284,17 @@ public class CountlyStore {
         return preferences_.getString(CACHED_ADVERTISING_ID, "");
     }
 
-    void setConsentPush(boolean consentValue){
-        preferencesGCM_.edit().putBoolean(CONSENT_GCM_PREFERENCES, consentValue).apply();
+    void setConsentPush(boolean consentValue) {
+        preferencesPush_.edit().putBoolean(CONSENT_GCM_PREFERENCES, consentValue).apply();
     }
 
-    Boolean getConsentPush(){
-        return preferencesGCM_.getBoolean(CONSENT_GCM_PREFERENCES, false);
+    Boolean getConsentPush() {
+        return preferencesPush_.getBoolean(CONSENT_GCM_PREFERENCES, false);
     }
 
     /**
      * Adds a custom event to the local store.
+     *
      * @param key name of the custom event, required, must not be the empty string
      * @param segmentation segmentation values for the custom event, may be null
      * @param timestamp timestamp (seconds since 1970) in GMT when the event occurred
@@ -267,14 +302,16 @@ public class CountlyStore {
      * @param dow current day of the week on device
      * @param count count associated with the custom event, should be more than zero
      * @param sum sum associated with the custom event, if not used, pass zero.
-     *            NaN and infinity values will be quietly ignored.
+     * NaN and infinity values will be quietly ignored.
      */
-    public synchronized void addEvent(final String key, final Map segmentation, final Map<String, Integer> segmentationInt, final Map<String, Double> segmentationDouble, final long timestamp, final int hour, final int dow, final int count, final double sum, final double dur) {
+    public synchronized void addEvent(final String key, final Map segmentation, final Map<String, Integer> segmentationInt, final Map<String, Double> segmentationDouble, final Map<String, Boolean> segmentationBoolean,
+        final long timestamp, final int hour, final int dow, final int count, final double sum, final double dur) {
         final Event event = new Event();
         event.key = key;
         event.segmentation = segmentation;
         event.segmentationDouble = segmentationDouble;
         event.segmentationInt = segmentationInt;
+        event.segmentationBoolean = segmentationBoolean;
         event.timestamp = timestamp;
         event.hour = hour;
         event.dow = dow;
@@ -288,6 +325,7 @@ public class CountlyStore {
     /**
      * Removes the specified events from the local store. Does nothing if the event collection
      * is null or empty.
+     *
      * @param eventsToRemove collection containing the events to remove from the local store
      */
     public synchronized void removeEvents(final Collection<Event> eventsToRemove) {
@@ -302,15 +340,55 @@ public class CountlyStore {
     /**
      * Converts a collection of Event objects to URL-encoded JSON to a string, with each
      * event JSON string delimited by the specified delimiter.
+     *
      * @param collection events to join into a delimited string
      * @param delimiter delimiter to use, should not be something that can be found in URL-encoded JSON string
      */
+    @SuppressWarnings("SameParameterValue")
     static String joinEvents(final Collection<Event> collection, final String delimiter) {
         final List<String> strings = new ArrayList<>();
         for (Event e : collection) {
             strings.add(e.toJSON().toString());
         }
         return join(strings, delimiter);
+    }
+
+    public static synchronized void cachePushData(String id_key, String index_key, Context context) {
+        SharedPreferences sp = createPreferencesPush(context);
+        sp.edit().putString(CACHED_PUSH_ACTION_ID, id_key).apply();
+        sp.edit().putString(CACHED_PUSH_ACTION_INDEX, index_key).apply();
+    }
+
+    String[] getCachedPushData() {
+        String[] res = new String[2];
+        res[0] = preferencesPush_.getString(CACHED_PUSH_ACTION_ID, null);
+        res[1] = preferencesPush_.getString(CACHED_PUSH_ACTION_INDEX, null);
+        return res;
+    }
+
+    void clearCachedPushData(){
+        preferencesPush_.edit().remove(CACHED_PUSH_ACTION_ID).apply();
+        preferencesPush_.edit().remove(CACHED_PUSH_ACTION_INDEX).apply();
+    }
+
+    public static void cacheLastMessagingMode(int mode, Context context) {
+        SharedPreferences sp = createPreferencesPush(context);
+        sp.edit().putInt(CACHED_PUSH_MESSAGING_MODE, mode).apply();
+    }
+
+    public static int getLastMessagingMode(Context context) {
+        SharedPreferences sp = createPreferencesPush(context);
+        return sp.getInt(CACHED_PUSH_MESSAGING_MODE, -1);
+    }
+
+    public static void storeMessagingProvider(int provider, Context context) {
+        SharedPreferences sp = createPreferencesPush(context);
+        sp.edit().putInt(CACHED_PUSH_MESSAGING_PROVIDER, provider).apply();
+    }
+
+    public static int getMessagingProvider(Context context) {
+        SharedPreferences sp = createPreferencesPush(context);
+        return sp.getInt(CACHED_PUSH_MESSAGING_PROVIDER, 0);
     }
 
     /**
@@ -332,6 +410,7 @@ public class CountlyStore {
 
     /**
      * Retrieves a preference from local store.
+     *
      * @param key the preference key
      */
     public synchronized String getPreference(final String key) {
@@ -340,6 +419,7 @@ public class CountlyStore {
 
     /**
      * Adds a preference to local store.
+     *
      * @param key the preference key
      * @param value the preference value, supply null value to remove preference
      */

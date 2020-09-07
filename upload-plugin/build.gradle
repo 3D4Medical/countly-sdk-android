@@ -3,7 +3,7 @@ buildscript {
         jcenter()
     }
     dependencies {
-        classpath 'com.novoda:bintray-release:0.9'
+        classpath 'com.novoda:bintray-release:0.9.1'
     }
 }
 
@@ -29,10 +29,10 @@ repositories {
 }
 
 dependencies {
-    compile gradleApi()
-    compile localGroovy()
+    implementation gradleApi()
+    implementation localGroovy()
     // implementation 'com.squareup.okhttp3:okhttp:3.14.1'
-    compile 'com.squareup.okhttp3:okhttp:3.14.1'
+    implementation 'com.squareup.okhttp3:okhttp:3.14.1'
     // classpath 'com.squareup.okhttp3:okhttp:3.14.1'
     // classpath group: 'com.squareup.okhttp3', name: 'okhttp', version: '3.14.1'
 }
@@ -43,7 +43,7 @@ publish {
     userOrg = 'countly'
     groupId = 'ly.count.android'
     artifactId = 'sdk-plugin'
-    publishVersion = '19.02.3'
+    publishVersion = '20.04.5'
     desc = 'Gradle plugin for automatic upload of symbol files'
     website = 'https://github.com/Countly/countly-sdk-android'
     autoPublish = false

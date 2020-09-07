@@ -1,15 +1,21 @@
 package ly.count.android.demo;
 
 import android.app.Activity;
+import android.content.res.Configuration;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 import android.widget.Toast;
 
 import java.util.Random;
+import java.util.regex.Pattern;
 
 import ly.count.android.sdk.Countly;
+import ly.count.android.sdk.CountlyConfig;
 import ly.count.android.sdk.CountlyStarRating;
+import ly.count.android.sdk.CrashFilterCallback;
 import ly.count.android.sdk.DeviceId;
+import ly.count.android.sdk.RemoteConfig;
 
 @SuppressWarnings("UnusedParameters")
 public class ActivityExampleOthers extends Activity {
@@ -21,47 +27,6 @@ public class ActivityExampleOthers extends Activity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_example_others);
         Countly.onCreate(this);
-    }
-
-    @SuppressWarnings("unused")
-    public void onClickViewOther01(View v) {
-
-    }
-
-    public void onClickViewOther02(View v) {
-        //show star rating
-        Countly.sharedInstance().showStarRating(activity, new CountlyStarRating.RatingCallback() {
-            @Override
-            public void onRate(int rating) {
-                Toast.makeText(activity, "onRate called with rating: " + rating, Toast.LENGTH_SHORT).show();
-            }
-
-            @Override
-            public void onDismiss() {
-                Toast.makeText(activity, "onDismiss called", Toast.LENGTH_SHORT).show();
-            }
-        });
-    }
-
-    public void onClickViewOther07(View v) {
-        //show rating widget
-        String widgetId = "xxxxx";
-        Countly.sharedInstance().showFeedbackPopup(widgetId, "Close", activity, new CountlyStarRating.FeedbackRatingCallback() {
-            @Override
-            public void callback(String error) {
-                if(error != null){
-                    Toast.makeText(activity, "Encountered error while showing feedback dialog: [" + error + "]", Toast.LENGTH_LONG).show();
-                }
-            }
-        });
-    }
-
-    public void onClickViewOther03(View v) {
-        Countly.sharedInstance().changeDeviceId(DeviceId.Type.DEVELOPER_SUPPLIED, "New Device ID" + (new Random().nextInt()));
-    }
-
-    public void onClickViewOther04(View v) {
-        Countly.sharedInstance().changeDeviceId("New Device ID!" + (new Random().nextInt()));
     }
 
     public void onClickViewOther05(View v) {
@@ -80,6 +45,41 @@ public class ActivityExampleOthers extends Activity {
         Countly.sharedInstance().disableLocation();
     }
 
+    public void onClickViewOther08(View v) {
+        //Clearing request queue
+        Countly.sharedInstance().flushRequestQueues();
+    }
+
+    public void onClickViewOther10(View v) {
+        //Doing internally stored requests
+        Countly.sharedInstance().doStoredRequests();
+    }
+
+    public void onClickTestcrashFilterSample(View v) {
+        Countly.sharedInstance().crashes().recordUnhandledException(new Throwable("A really secret exception"));
+    }
+
+    public void onClickRemoveAllConsent(View v){
+        Countly.sharedInstance().consent().removeConsentAll();
+    }
+
+    public void onClickGiveAllConsent(View v){
+        Countly.sharedInstance().consent().giveConsentAll();
+    }
+
+    public void onClickHaltAndInit(View v) {
+        Countly.sharedInstance().halt();
+
+        final String COUNTLY_SERVER_URL = "YOUR_SERVER";
+        final String COUNTLY_APP_KEY = "YOUR_APP_KEY";
+
+        CountlyConfig config = (new CountlyConfig(this, COUNTLY_APP_KEY, COUNTLY_SERVER_URL)).setIdMode(DeviceId.Type.OPEN_UDID)
+                .enableCrashReporting().setLoggingEnabled(true).enableCrashReporting().setViewTracking(true).setAutoTrackingUseShortName(true)
+                .setRequiresConsent(false);
+
+        Countly.sharedInstance().init(config);
+    }
+
     @Override
     public void onStart()
     {
@@ -92,5 +92,11 @@ public class ActivityExampleOthers extends Activity {
     {
         Countly.sharedInstance().onStop();
         super.onStop();
+    }
+
+    @Override
+    public void onConfigurationChanged (Configuration newConfig){
+        super.onConfigurationChanged(newConfig);
+        Countly.sharedInstance().onConfigurationChanged(newConfig);
     }
 }

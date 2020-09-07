@@ -13,9 +13,9 @@ public class DeviceId {
      * Enum used throughout Countly which controls what kind of ID Countly should use.
      */
     public enum Type {
-        DEVELOPER_SUPPLIED,
-        OPEN_UDID,
-        ADVERTISING_ID,
+        DEVELOPER_SUPPLIED,//custom value provided by the developer
+        OPEN_UDID,//random UDID generated
+        ADVERTISING_ID,//id provided by the android OS
     }
 
     private static final String TAG = "DeviceId";
@@ -24,11 +24,14 @@ public class DeviceId {
     private static final String PREFERENCE_KEY_ID_ROLLBACK_ID = "ly.count.android.api.DeviceId.rollback.id";
     private static final String PREFERENCE_KEY_ID_ROLLBACK_TYPE = "ly.count.android.api.DeviceId.rollback.type";
 
+    protected final static String temporaryCountlyDeviceId = "CLYTemporaryDeviceID";
+
     private String id;
     private Type type;
 
     /**
      * Initialize DeviceId with Type of OPEN_UDID or ADVERTISING_ID
+     *
      * @param type type of ID generation strategy
      */
     protected DeviceId(CountlyStore store, Type type) {
@@ -38,12 +41,12 @@ public class DeviceId {
             throw new IllegalStateException("Please use another DeviceId constructor for device IDs supplied by developer");
         }
         this.type = type;
-
         retrieveId(store);
     }
 
     /**
      * Initialize DeviceId with Developer-supplied id string
+     *
      * @param developerSuppliedId Device ID string supplied by developer
      */
     protected DeviceId(CountlyStore store, String developerSuppliedId) {
@@ -56,7 +59,7 @@ public class DeviceId {
         retrieveId(store);
     }
 
-    private void retrieveId (CountlyStore store) {
+    private void retrieveId(CountlyStore store) {
         String storedId = store.getPreference(PREFERENCE_KEY_ID_ID);
         if (storedId != null) {
             this.id = storedId;
@@ -70,6 +73,7 @@ public class DeviceId {
      * In some cases, Countly can override ID generation strategy to other one, for example when
      * Google Play Services are not available and user chose Advertising ID strategy, it will fall
      * back to OpenUDID
+     *
      * @param context Context to use
      * @param store CountlyStore to store configuration in
      * @param raiseExceptions whether to raise exceptions in case of illegal state or not
@@ -81,7 +85,7 @@ public class DeviceId {
         // some other strategy. We still have to use that strategy.
         if (overriddenType != null && overriddenType != type) {
             if (Countly.sharedInstance().isLoggingEnabled()) {
-                Log.i(TAG, "Overridden device ID generation strategy detected: " + overriddenType + ", using it instead of " + this.type);
+                Log.i(TAG, "[DeviceId] Overridden device ID generation strategy detected: " + overriddenType + ", using it instead of " + this.type);
             }
             type = overriddenType;
         }
@@ -93,7 +97,7 @@ public class DeviceId {
             case OPEN_UDID:
                 if (OpenUDIDAdapter.isOpenUDIDAvailable()) {
                     if (Countly.sharedInstance().isLoggingEnabled()) {
-                        Log.i(TAG, "Using OpenUDID");
+                        Log.i(TAG, "[DeviceId] Using OpenUDID");
                     }
                     if (!OpenUDIDAdapter.isInitialized()) {
                         OpenUDIDAdapter.sync(context);
@@ -105,13 +109,13 @@ public class DeviceId {
             case ADVERTISING_ID:
                 if (AdvertisingIdAdapter.isAdvertisingIdAvailable()) {
                     if (Countly.sharedInstance().isLoggingEnabled()) {
-                        Log.i(TAG, "Using Advertising ID");
+                        Log.i(TAG, "[DeviceId] Using Advertising ID");
                     }
                     AdvertisingIdAdapter.setAdvertisingId(context, store, this);
                 } else if (OpenUDIDAdapter.isOpenUDIDAvailable()) {
                     // Fall back to OpenUDID on devices without google play services set up
                     if (Countly.sharedInstance().isLoggingEnabled()) {
-                        Log.i(TAG, "Advertising ID is not available, falling back to OpenUDID");
+                        Log.i(TAG, "[DeviceId] Advertising ID is not available, falling back to OpenUDID");
                     }
                     if (!OpenUDIDAdapter.isInitialized()) {
                         OpenUDIDAdapter.sync(context);
@@ -119,7 +123,7 @@ public class DeviceId {
                 } else {
                     // just do nothing, without Advertising ID and OpenUDID this user is lost for Countly
                     if (Countly.sharedInstance().isLoggingEnabled()) {
-                        Log.w(TAG, "Advertising ID is not available, neither OpenUDID is");
+                        Log.w(TAG, "[DeviceId] Advertising ID is not available, neither OpenUDID is");
                     }
                     if (raiseExceptions) throw new IllegalStateException("OpenUDID is not available, please make sure that you have it in your classpath");
                 }
@@ -159,17 +163,19 @@ public class DeviceId {
         return id;
     }
 
+    @SuppressWarnings("SameParameterValue")
     protected void setId(Type type, String id) {
         if (Countly.sharedInstance().isLoggingEnabled()) {
-            Log.w(TAG, "Device ID is " + id + " (type " + type + ")");
+            Log.w(TAG, "[DeviceId] Device ID is " + id + " (type " + type + ")");
         }
         this.type = type;
         this.id = id;
     }
 
+    @SuppressWarnings("SameParameterValue")
     protected void switchToIdType(Type type, Context context, CountlyStore store) {
         if (Countly.sharedInstance().isLoggingEnabled()) {
-            Log.w(TAG, "Switching to device ID generation strategy " + type + " from " + this.type);
+            Log.w(TAG, "[DeviceId] Switching to device ID generation strategy " + type + " from " + this.type);
         }
         this.type = type;
         storeOverriddenType(store, type);
@@ -193,7 +199,7 @@ public class DeviceId {
         return oldId;
     }
 
-    protected void changeToId (Context context, CountlyStore store, Type type, String deviceId) {
+    protected void changeToId(Context context, CountlyStore store, Type type, String deviceId) {
         this.id = deviceId;
         this.type = type;
 
@@ -227,8 +233,18 @@ public class DeviceId {
         return type;
     }
 
+    protected boolean temporaryIdModeEnabled() {
+        String id = getId();
+        if (id == null) {
+            return false;
+        }
+
+        return id.equals(temporaryCountlyDeviceId);
+    }
+
     /**
      * Helper method for null safe comparison of current device ID and the one supplied to Countly.init
+     *
      * @return true if supplied device ID equal to the one registered before
      */
     static boolean deviceIDEqualsNullSafe(final String id, Type type, final DeviceId deviceId) {
