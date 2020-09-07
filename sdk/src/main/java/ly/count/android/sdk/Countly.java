@@ -1083,7 +1083,7 @@ public class Countly {
      * @throws IllegalArgumentException if key is null or empty
      * @deprecated record events through 'Countly.sharedInstance().events()'
      */
-    public void recordEvent(final String key, final Map segmentation, final int count) {
+    public void recordEvent(final String key, final Map<String, Object> segmentation, final int count) {
         recordEvent(key, segmentation, count, 0);
     }
 
@@ -1099,7 +1099,7 @@ public class Countly {
      * segmentation contains null or empty keys or values
      * @deprecated record events through 'Countly.sharedInstance().events()'
      */
-    public synchronized void recordEvent(final String key, final Map segmentation, final int count, final double sum) {
+    public synchronized void recordEvent(final String key, final Map<String, Object> segmentation, final int count, final double sum) {
         recordEvent(key, segmentation, count, sum, 0);
     }
 
@@ -1116,7 +1116,7 @@ public class Countly {
      * segmentation contains null or empty keys or values
      * @deprecated record events through 'Countly.sharedInstance().events()'
      */
-    public synchronized void recordEvent(final String key, final Map segmentation, final int count, final double sum, final double dur){
+    public synchronized void recordEvent(final String key, final Map<String, Object> segmentation, final int count, final double sum, final double dur) {
         recordEvent(key, segmentation, null, null, count, sum, dur);
     }
 
@@ -1133,7 +1133,8 @@ public class Countly {
      * segmentation contains null or empty keys or values
      * @deprecated record events through 'Countly.sharedInstance().events()'
      */
-    public synchronized void recordEvent(final String key, final Map segmentation, final Map<String, Integer> segmentationInt, final Map<String, Double> segmentationDouble, final int count, final double sum, final double dur) {
+    public synchronized void recordEvent(final String key, final Map<String, Object> segmentation, final Map<String, Integer> segmentationInt, final Map<String, Double> segmentationDouble, final int count, final double sum,
+        final double dur) {
         if (!isInitialized()) {
             throw new IllegalStateException("Countly.sharedInstance().init must be called before recordEvent");
         }
@@ -1152,6 +1153,60 @@ public class Countly {
         }
 
         events().recordEvent(key, segmentationGroup, count, sum, dur);
+    }
+
+    /**
+     * Records a custom event with the specified values.
+     *
+     * @param key name of the custom event, required, must not be the empty string
+     * @param segmentation segmentation dictionary to associate with the event, can be null
+     * @param count count to associate with the event, should be more than zero
+     * @param sum sum to associate with the event
+     * @param dur duration of an event
+     * @param timestamp timestamp of an event
+     * @throws IllegalStateException if Countly SDK has not been initialized
+     * @throws IllegalArgumentException if key is null or empty, count is less than 1, or if
+     * segmentation contains null or empty keys or values
+     * @deprecated record events through 'Countly.sharedInstance().events()'
+     */
+    public synchronized void recordEvent(final String key, final Map<String, Object> segmentation, final int count, final double sum, final double dur, final long timestamp) {
+        recordEvent(key, segmentation, null, null, count, sum, dur, timestamp);
+    }
+
+    /**
+     * Records a custom event with the specified values.
+     *
+     * @param key name of the custom event, required, must not be the empty string
+     * @param segmentation segmentation dictionary to associate with the event, can be null
+     * @param count count to associate with the event, should be more than zero
+     * @param sum sum to associate with the event
+     * @param dur duration of an event
+     * @param timestamp timestam of an event
+     * @throws IllegalStateException if Countly SDK has not been initialized
+     * @throws IllegalArgumentException if key is null or empty, count is less than 1, or if
+     * segmentation contains null or empty keys or values
+     * @deprecated record events through 'Countly.sharedInstance().events()'
+     */
+    public synchronized void recordEvent(final String key, final Map<String, Object> segmentation, final Map<String, Integer> segmentationInt, final Map<String, Double> segmentationDouble, final int count, final double sum,
+            final double dur, final long timestamp) {
+        if (!isInitialized()) {
+            throw new IllegalStateException("Countly.sharedInstance().init must be called before recordEvent");
+        }
+
+        Map<String, Object> segmentationGroup = new HashMap<>();
+        if (segmentation != null) {
+            segmentationGroup.putAll(segmentation);
+        }
+
+        if (segmentationInt != null) {
+            segmentationGroup.putAll(segmentationInt);
+        }
+
+        if (segmentationDouble != null) {
+            segmentationGroup.putAll(segmentationDouble);
+        }
+
+        events().recordEvent(key, segmentationGroup, count, sum, dur, timestamp);
     }
 
     /**

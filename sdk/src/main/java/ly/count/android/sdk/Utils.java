@@ -8,6 +8,11 @@ import android.os.Build;
 import android.util.DisplayMetrics;
 import android.util.Log;
 
+import java.util.ArrayList;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -15,12 +20,12 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.ThreadPoolExecutor;
 
 import static android.content.Context.UI_MODE_SERVICE;
 
@@ -160,6 +165,14 @@ public class Utils {
         return data;
     }
 
+    static <T> boolean isUnsupportedDataType(T value) {
+        if (value.getClass().isArray()) {
+            return isUnsupportedType(value.getClass().getComponentType());
+        }
+
+        return isUnsupportedType(value.getClass());
+    }
+
     /**
      * Removes unsupported data types
      *
@@ -182,8 +195,7 @@ public class Utils {
 
             }
 
-            if (key == null || key.isEmpty() ||
-                !(value instanceof String || value instanceof Integer || value instanceof Double || value instanceof Boolean)) {
+            if (key == null || key.isEmpty() || isUnsupportedDataType(value)) {
                 //found unsupported data type or null key or value, removing
                 it.remove();
                 removed = true;
@@ -200,6 +212,85 @@ public class Utils {
     }
 
     /**
+     * Serialize Map implementation with supported types
+     * @param map Implementation of Map interface which holds allowed data types
+     * @return serialization result as JSONObject
+     */
+    static JSONObject serialize(Map map) throws JSONException {
+        JSONObject serializedMap = new JSONObject();
+        for (Object key : map.keySet()) {
+            Object value = map.get(key);
+            if (value.getClass().isArray()) {
+                serializedMap.put((String)key, serialize((Object[])value));
+            } else if (value instanceof List) {
+                serializedMap.put((String)key, serialize((List)value));
+            } else {
+                putActualType(serializedMap, (String)key, value);
+            }
+        }
+
+        return serializedMap;
+    }
+
+    /**
+     * Serialize List implementation with supported types
+     * @param list Implementation of List interface which holds allowed data types
+     * @return serialization result as JSONArray
+     */
+    static JSONArray serialize(List list) throws JSONException {
+        if (list.isEmpty()) return new JSONArray();
+        // Check type of list elements
+        if (isUnsupportedType(list.get(0).getClass())) {
+            throw new JSONException("List constructed from " + list.get(0).getClass().getName() +
+                                        " is unsupported for proper serialization");
+        }
+
+        JSONArray serializedList = new JSONArray();
+        for (Object element : list) {
+            putActualType(serializedList, element);
+        }
+
+        return serializedList;
+    }
+
+    /**
+     * Serialize array of supported types
+     * @param array array of allowed data type
+     * @return serialization result as JSONArray
+     */
+    static JSONArray serialize(Object[] array) throws JSONException {
+        // Type of array should be already checked
+        JSONArray serializedArray = new JSONArray();
+        for (Object element : array) {
+            putActualType(serializedArray, element);
+        }
+
+        return serializedArray;
+    }
+
+    /**
+     * Wrapper around JSONObject.opt(String) which perform special handling of JSONArray type (decoded as ArrayList)
+     * @param json JSONObject for opt(String) call
+     * @param key key for accessing value
+     * @return value for specified key
+     * @throws JSONException
+     */
+    static Object optActualType(JSONObject json, String key) throws JSONException {
+        Object value = json.opt(key);
+        if (value instanceof JSONArray) {
+            ArrayList actualValue = new ArrayList();
+            for (int index = 0; index < ((JSONArray) value).length(); ++index) {
+                actualValue.add(((JSONArray) value).get(index));
+            }
+
+            return actualValue;
+        }
+
+        // For now I think we don't need further decoding
+        return value;
+    }
+
+    /**
      * Used for quickly sorting segments into their respective data type
      *
      * @param allSegm
@@ -208,7 +299,7 @@ public class Utils {
      * @param segmDouble
      * @param segmBoolean
      */
-    protected static synchronized void fillInSegmentation(Map<String, Object> allSegm, Map<String, String> segmStr, Map<String, Integer> segmInt, Map<String, Double> segmDouble, Map<String, Boolean> segmBoolean,
+    protected static synchronized void fillInSegmentation(Map<String, Object> allSegm, Map<String, Object> segmObj, Map<String, Integer> segmInt, Map<String, Double> segmDouble, Map<String, Boolean> segmBoolean,
         Map<String, Object> reminder) {
         for (Map.Entry<String, Object> pair : allSegm.entrySet()) {
             String key = pair.getKey();
@@ -218,10 +309,10 @@ public class Utils {
                 segmInt.put(key, (Integer) value);
             } else if (value instanceof Double) {
                 segmDouble.put(key, (Double) value);
-            } else if (value instanceof String) {
-                segmStr.put(key, (String) value);
             } else if (value instanceof Boolean) {
                 segmBoolean.put(key, (Boolean) value);
+            } else if (!isUnsupportedDataType(value)) {
+                segmObj.put(key, value);
             } else {
                 if (reminder != null) {
                     reminder.put(key, value);
@@ -271,6 +362,63 @@ public class Utils {
             return true;
         } else {
             return false;
+        }
+    }
+
+    /**
+     * Used for checking if value type can't be serialized
+     *
+     * @return
+     */
+    protected static boolean isUnsupportedType(Class type) {
+        if (!(Boolean.class.isAssignableFrom(type) ||
+              Character.class.isAssignableFrom(type) ||
+              Short.class.isAssignableFrom(type) ||
+              Integer.class.isAssignableFrom(type) ||
+              Long.class.isAssignableFrom(type) ||
+              String.class.isAssignableFrom(type) ||
+              List.class.isAssignableFrom(type))) {
+            return true;
+        }
+
+        return false;
+    }
+
+    protected static void putActualType(JSONObject json, String key, Object value) throws JSONException {
+        if (value instanceof Boolean) {
+            json.put(key, (boolean) value);
+        } else if (value instanceof Character) {
+            json.put(key, Character.toString((char) value));
+        } else if (value instanceof Short) {
+            json.put(key, (int) value);
+        } else if (value instanceof Integer) {
+            json.put(key, (int) value);
+        } else if (value instanceof Long) {
+            json.put(key, (long) value);
+        } else if (value instanceof Float || value instanceof Double) {
+            json.put(key, (double) value);
+        } else if (value instanceof String) {
+            json.put(key, (String) value);
+        } else {
+            throw new JSONException("Unsupported for proper serialization type " + value.getClass().getName());
+        }
+    }
+
+    protected static void putActualType(JSONArray json, Object value) throws JSONException {
+        if (value instanceof Boolean) {
+            json.put((boolean) value);
+        } else if (value instanceof Character) {
+            json.put(Character.toString((char) value));
+        } else if (value instanceof Short || value instanceof Integer) {
+            json.put((int) value);
+        } else if (value instanceof Long) {
+            json.put((long) value);
+        } else if (value instanceof Float || value instanceof Double) {
+            json.put((double) value);
+        } else if (value instanceof String) {
+            json.put((String) value);
+        } else {
+            throw new JSONException("Unsupported for proper serialization type " + value.getClass().getName());
         }
     }
 }

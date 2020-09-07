@@ -428,7 +428,7 @@ public class ModuleRatings extends ModuleBase {
                 int rating = (int) v;
 
                 if (Countly.sharedInstance().getConsent(Countly.CountlyFeatureNames.starRating)) {
-                    Map<String, String> segm = new HashMap<>();
+                    Map<String, Object> segm = new HashMap<>();
                     segm.put("platform", "android");
                     segm.put("app_version", DeviceInfo.getAppVersion(context));
                     segm.put("rating", "" + rating);

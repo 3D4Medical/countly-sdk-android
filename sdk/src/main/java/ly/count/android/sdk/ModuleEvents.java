@@ -74,13 +74,13 @@ public class ModuleEvents extends ModuleBase {
             throw new IllegalStateException("Countly.sharedInstance().init must be called before recordEvent");
         }
 
-        Map<String, String> segmentationString = null;
+        Map<String, Object> segmentationObject = null;
         Map<String, Integer> segmentationInt = null;
         Map<String, Double> segmentationDouble = null;
         Map<String, Boolean> segmentationBoolean = null;
 
         if (segmentation != null) {
-            segmentationString = new HashMap<>();
+            segmentationObject = new HashMap<>();
             segmentationInt = new HashMap<>();
             segmentationDouble = new HashMap<>();
             segmentationBoolean = new HashMap<>();
@@ -90,7 +90,7 @@ public class ModuleEvents extends ModuleBase {
             if (!processedSegmentation) {
                 Utils.removeKeysFromMap(segmentation, ModuleEvents.reservedSegmentationKeys);
             }
-            Utils.fillInSegmentation(segmentation, segmentationString, segmentationInt, segmentationDouble, segmentationBoolean, segmentationReminder);
+            Utils.fillInSegmentation(segmentation, segmentationObject, segmentationInt, segmentationDouble, segmentationBoolean, segmentationReminder);
 
             if (segmentationReminder.size() > 0) {
                 if (_cly.isLoggingEnabled()) {
@@ -107,14 +107,14 @@ public class ModuleEvents extends ModuleBase {
                 }
             }
 
-            for (String k : segmentationString.keySet()) {
+            for (String k : segmentationObject.keySet()) {
                 if (k == null || k.length() == 0) {
                     if (_cly.isLoggingEnabled()) {
                         Log.e(Countly.TAG, "[ModuleEvents] Countly event segmentation key cannot be null or empty, skipping");
                     }
                     continue;
                 }
-                if (segmentationString.get(k) == null) {
+                if (segmentationObject.get(k) == null) {
                     if (_cly.isLoggingEnabled()) {
                         Log.e(Countly.TAG, "[ModuleEvents] Countly event segmentation value cannot be null, skipping");
                     }
@@ -126,25 +126,25 @@ public class ModuleEvents extends ModuleBase {
         switch (key) {
             case ModuleRatings.STAR_RATING_EVENT_KEY:
                 if (Countly.sharedInstance().getConsent(Countly.CountlyFeatureNames.starRating)) {
-                    _cly.eventQueue_.recordEvent(key, segmentationString, segmentationInt, segmentationDouble, segmentationBoolean, count, sum, dur, instant);
+                    _cly.eventQueue_.recordEvent(key, segmentationObject, segmentationInt, segmentationDouble, segmentationBoolean, count, sum, dur, instant);
                     _cly.sendEventsForced();
                 }
                 break;
             case ModuleViews.VIEW_EVENT_KEY:
                 if (Countly.sharedInstance().getConsent(Countly.CountlyFeatureNames.views)) {
-                    _cly.eventQueue_.recordEvent(key, segmentationString, segmentationInt, segmentationDouble, segmentationBoolean, count, sum, dur, instant);
+                    _cly.eventQueue_.recordEvent(key, segmentationObject, segmentationInt, segmentationDouble, segmentationBoolean, count, sum, dur, instant);
                     _cly.sendEventsForced();
                 }
                 break;
             case ModuleViews.ORIENTATION_EVENT_KEY:
                 if (Countly.sharedInstance().getConsent(Countly.CountlyFeatureNames.events)) {
-                    _cly.eventQueue_.recordEvent(key, segmentationString, segmentationInt, segmentationDouble, segmentationBoolean, count, sum, dur, instant);
+                    _cly.eventQueue_.recordEvent(key, segmentationObject, segmentationInt, segmentationDouble, segmentationBoolean, count, sum, dur, instant);
                     _cly.sendEventsIfNeeded();
                 }
                 break;
             default:
                 if (Countly.sharedInstance().getConsent(Countly.CountlyFeatureNames.events)) {
-                    _cly.eventQueue_.recordEvent(key, segmentationString, segmentationInt, segmentationDouble, segmentationBoolean, count, sum, dur, instant);
+                    _cly.eventQueue_.recordEvent(key, segmentationObject, segmentationInt, segmentationDouble, segmentationBoolean, count, sum, dur, instant);
                     _cly.sendEventsIfNeeded();
                 }
                 break;
@@ -430,6 +430,31 @@ public class ModuleEvents extends ModuleBase {
             }
 
             recordEventInternal(key, segmentation, count, sum, dur, null, false);
+        }
+
+        /**
+         * Records a custom event with the specified values.
+         *
+         * @param key name of the custom event, required, must not be the empty string
+         * @param segmentation segmentation dictionary to associate with the event, can be null
+         * @param count count to associate with the event, should be more than zero
+         * @param sum sum to associate with the event
+         * @param dur duration of an event
+         * @param timestamp timestamp of an event
+         * @throws IllegalStateException if Countly SDK has not been initialized
+         * @throws IllegalArgumentException if key is null or empty, count is less than 1, or if segmentation contains null or empty keys or values
+         */
+        public synchronized void recordEvent(final String key, final Map<String, Object> segmentation, final int count, final double sum, final double dur, final long timestamp) {
+            if (!_cly.isInitialized()) {
+                throw new IllegalStateException("Countly.sharedInstance().init must be called before recordEvent");
+            }
+
+            if (_cly.isLoggingEnabled()) {
+                Log.i(Countly.TAG, "[Events] Calling recordEvent: [" + key + "]");
+            }
+
+            UtilsTime.Instant currentInstant = UtilsTime.getCurrentInstant();
+            recordEventInternal(key, segmentation, count, sum, dur, new UtilsTime.Instant(timestamp, currentInstant.hour, currentInstant.dow), false);
         }
     }
 }

@@ -23,13 +23,11 @@ package ly.count.android.sdk;
 
 import android.util.Log;
 
-import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -49,7 +47,7 @@ class Event {
     private static final String HOUR = "hour";
 
     public String key;
-    public Map segmentation;
+    public Map<String, Object> segmentation;
     public Map<String, Integer> segmentationInt;
     public Map<String, Double> segmentationDouble;
     public Map<String, Boolean> segmentationBoolean;
@@ -89,7 +87,7 @@ class Event {
 
             JSONObject jobj = new JSONObject();
             if (segmentation != null) {
-                jobj = JSONUtils.serializeMap(segmentation);
+                jobj = Utils.serialize(segmentation);
             }
 
             if (segmentationInt != null) {
@@ -156,7 +154,7 @@ class Event {
             if (!json.isNull(SEGMENTATION_KEY)) {
                 JSONObject segm = json.getJSONObject(SEGMENTATION_KEY);
 
-                final HashMap<String, String> segmentation = new HashMap<>();
+                final HashMap<String, Object> segmentation = new HashMap<>();
                 final HashMap<String, Integer> segmentationInt = new HashMap<>();
                 final HashMap<String, Double> segmentationDouble = new HashMap<>();
                 final HashMap<String, Boolean> segmentationBoolean = new HashMap<>();
@@ -177,8 +175,7 @@ class Event {
                             //in case it's a boolean
                             segmentationBoolean.put(key, segm.getBoolean(key));
                         } else {
-                            //assume it's String
-                            segmentation.put(key, segm.getString(key));
+                            segmentation.put(key, Utils.optActualType(segm, key));
                         }
                     }
                 }

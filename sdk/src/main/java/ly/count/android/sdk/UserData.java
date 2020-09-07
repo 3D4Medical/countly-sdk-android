@@ -6,10 +6,8 @@ import java.net.URL;
 import java.net.URLDecoder;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 
-import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -35,7 +33,7 @@ public class UserData {
     protected static String picture;
     protected static String picturePath;//protected only for testing
     protected static String gender;
-    protected static Map custom;
+    protected static Map<String, Object> custom;
     protected static Map<String, JSONObject> customMods;
     protected static int byear = 0;
     protected static boolean isSynced = true;//protected only for testing
@@ -126,9 +124,9 @@ public class UserData {
      * </ul>
      *
      * @param data Map&lt;String, String&gt; with user data
-     * @param customdata Map&lt;String, String&gt; with custom key values for this user
+     * @param customdata Map&lt;String, Object&gt; with custom key values for this user
      */
-    public void setUserData(Map<String, String> data, Map customdata) {
+    public void setUserData(Map<String, String> data, Map<String, Object> customdata) {
         UserData.setData(data);
         if (customdata != null) {
             UserData.setCustomData(customdata);
@@ -139,9 +137,9 @@ public class UserData {
      * Sets custom properties.
      * In custom properties you can provide any string key values to be stored with user
      *
-     * @param customdata Map&lt;String, String&gt; with custom key values for this user
+     * @param customdata Map&lt;String, Object&gt; with custom key values for this user
      */
-    public void setCustomUserData(Map<String, String> customdata) {
+    public void setCustomUserData(Map<String, Object> customdata) {
         if (customdata != null) {
             UserData.setCustomData(customdata);
         }
@@ -326,9 +324,9 @@ public class UserData {
      *
      * @param data Map with user custom key/values
      */
-    public static void setCustomData(Map data) {
+    public static void setCustomData(Map<String, Object> data) {
         if (custom == null) {
-            custom = new HashMap<>();
+            custom = new HashMap();
         }
         custom.putAll(data);
         isSynced = false;
@@ -342,7 +340,7 @@ public class UserData {
      */
     public static void setCustomProperty(String key, Object value) {
         if (custom == null) {
-            custom = new HashMap<>();
+            custom = new HashMap();
         }
         custom.put(key, value);
         isSynced = false;
@@ -515,9 +513,9 @@ public class UserData {
             }
 
             JSONObject ob;
-            if(custom != null){
-                ob = JSONUtils.serializeMap(custom);
-            } else{
+            if (custom != null) {
+                ob = Utils.serialize(custom);
+            } else {
                 ob = new JSONObject();
             }
             if (customMods != null) {

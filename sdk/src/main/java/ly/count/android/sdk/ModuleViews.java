@@ -178,7 +178,7 @@ public class ModuleViews extends ModuleBase {
         if (currentOrientation != newOrientation) {
             currentOrientation = newOrientation;
 
-            Map<String, String> segm = new HashMap<>();
+            Map<String, Object> segm = new HashMap<>();
 
             if (currentOrientation == Configuration.ORIENTATION_PORTRAIT) {
                 segm.put("mode", "portrait");

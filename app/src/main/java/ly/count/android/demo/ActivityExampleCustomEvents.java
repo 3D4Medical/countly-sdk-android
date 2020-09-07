@@ -45,7 +45,7 @@ public class ActivityExampleCustomEvents extends Activity {
     }
 
     public void onClickRecordEvent06(View v) {
-        Map<String, String> segmentation = new HashMap<>();
+        Map<String, Object> segmentation = new HashMap<>();
         segmentation.put("wall", "red");
         Map<String, Integer> segmentationInt = new HashMap<>();
         segmentationInt.put("flowers", 3);
@@ -56,7 +56,7 @@ public class ActivityExampleCustomEvents extends Activity {
     }
 
     public void onClickRecordEvent07(View v) {
-        Map<String, String> segmentation = new HashMap<>();
+        Map<String, Object> segmentation = new HashMap<>();
         segmentation.put("wall", "blue");
         Map<String, Integer> segmentationInt = new HashMap<>();
         segmentationInt.put("flowers", new Random().nextInt());
