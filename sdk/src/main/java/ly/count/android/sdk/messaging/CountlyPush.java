@@ -260,7 +260,14 @@ public class CountlyPush {
                     context.startActivity(i);
                 } else {
                     intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                    context.startActivity(intent);
+                    /// Solving Intent redirection, detected by Play Console during pre-launch tests
+                    String activityPackage = intent.resolveActivity(context.getPackageManager()).getPackageName();
+                    int intentFlags = intent.getFlags();
+                    if (activityPackage.equals("com.a3d4medical.completeanatomy") ||
+                        ((intentFlags & Intent.FLAG_GRANT_READ_URI_PERMISSION) == 0 &&
+                            (intentFlags & Intent.FLAG_GRANT_WRITE_URI_PERMISSION) == 0)) {
+                        context.startActivity(intent);
+                    }
                 }
             } else {
                 Intent i = new Intent(Intent.ACTION_VIEW, message.buttons().get(index - 1).link());
