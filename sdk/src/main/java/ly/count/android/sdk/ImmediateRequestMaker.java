@@ -2,14 +2,12 @@ package ly.count.android.sdk;
 
 import android.os.AsyncTask;
 import android.util.Log;
-
-import org.json.JSONObject;
-
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
+import org.json.JSONObject;
 
 /**
  * Async task for making immediate server requests
@@ -43,7 +41,6 @@ class ImmediateRequestMaker extends AsyncTask<Object, Void, JSONObject> {
         final boolean requestShouldBeDelayed = (boolean) params[3];
         callback = (InternalFeedbackRatingCallback) params[4];
 
-
         HttpURLConnection connection = null;
         BufferedReader reader = null;
         boolean wasSuccess = true;
@@ -63,7 +60,7 @@ class ImmediateRequestMaker extends AsyncTask<Object, Void, JSONObject> {
                     Thread.sleep(500);
                 } catch (InterruptedException e) {
                     if (Countly.sharedInstance().isLoggingEnabled()) {
-                        Log.w(Countly.TAG, "[ImmediateRequestMaker]While waiting for 0.5 seconds in ImmediateRequestMaker, sleep was interrupted");
+                        Log.w(Countly.TAG, "[ImmediateRequestMaker] While waiting for 0.5 seconds in ImmediateRequestMaker, sleep was interrupted");
                     }
                 }
             }

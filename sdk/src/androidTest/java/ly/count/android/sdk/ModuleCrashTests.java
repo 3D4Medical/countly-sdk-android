@@ -1,7 +1,8 @@
 package ly.count.android.sdk;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
-
+import java.util.HashMap;
+import java.util.Map;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -9,14 +10,8 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
 import static androidx.test.InstrumentationRegistry.getContext;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.booleanThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
@@ -51,7 +46,7 @@ public class ModuleCrashTests {
         CrashFilterCallback callback = new CrashFilterCallback() {
             @Override
             public boolean filterCrash(String crash) {
-                if(crash.contains("Secret")){
+                if (crash.contains("Secret")) {
                     return true;
                 }
                 return false;
@@ -74,7 +69,7 @@ public class ModuleCrashTests {
         cConfig.setCrashFilterCallback(new CrashFilterCallback() {
             @Override
             public boolean filterCrash(String crash) {
-                if(crash.contains("Secret")){
+                if (crash.contains("Secret")) {
                     return true;
                 }
                 return false;
@@ -104,7 +99,7 @@ public class ModuleCrashTests {
         verify(connectionQueue).sendCrashReport(arg.capture(), eq(true), eq(false), isNull(Map.class));
 
         Assert.assertTrue(arg.getValue().startsWith("java.lang.Exception: Reasonable message\n" +
-                "\tat ly.count.android.sdk.ModuleCrashTests.crashFilterTest(ModuleCrashTests.java:"));
+            "\tat ly.count.android.sdk.ModuleCrashTests.crashFilterTest(ModuleCrashTests.java:"));
     }
 
     @Test
@@ -124,9 +119,9 @@ public class ModuleCrashTests {
         segm.put("3", true);
         segm.put("4", 45.4f);
         segm.put("41", new Object());
-        segm.put("42", new int[]{1, 2});
+        segm.put("42", new int[] { 1, 2 });
 
-        for(String it : ModuleEvents.reservedSegmentationKeys) {
+        for (String it : ModuleEvents.reservedSegmentationKeys) {
             segm.put(it, it);
         }
 
@@ -165,7 +160,7 @@ public class ModuleCrashTests {
         verify(connectionQueue).sendCrashReport(arg.capture(), eq(true), eq(false), isNull(Map.class));
 
         Assert.assertTrue(arg.getValue().startsWith("java.lang.Exception: Some message\n" +
-                "\tat ly.count.android.sdk.ModuleCrashTests.recordHandledExceptionException(ModuleCrashTests.java:"));
+            "\tat ly.count.android.sdk.ModuleCrashTests.recordHandledExceptionException(ModuleCrashTests.java:"));
     }
 
     @Test
@@ -180,7 +175,7 @@ public class ModuleCrashTests {
         String crash = arg.getValue();
 
         Assert.assertTrue(crash.startsWith("java.lang.Throwable: Some message\n" +
-                "\tat ly.count.android.sdk.ModuleCrashTests.recordHandledExceptionThrowable(ModuleCrashTests.java:"));
+            "\tat ly.count.android.sdk.ModuleCrashTests.recordHandledExceptionThrowable(ModuleCrashTests.java:"));
     }
 
     @Test
@@ -195,7 +190,7 @@ public class ModuleCrashTests {
         String crash = arg.getValue();
 
         Assert.assertTrue(crash.startsWith("java.lang.Exception: Some message\n" +
-                "\tat ly.count.android.sdk.ModuleCrashTests.recordUnhandledExceptionException(ModuleCrashTests.java:"));
+            "\tat ly.count.android.sdk.ModuleCrashTests.recordUnhandledExceptionException(ModuleCrashTests.java:"));
     }
 
     @Test
@@ -210,7 +205,7 @@ public class ModuleCrashTests {
         String crash = arg.getValue();
 
         Assert.assertTrue(crash.startsWith("java.lang.Throwable: Some message\n" +
-                "\tat ly.count.android.sdk.ModuleCrashTests.recordUnhandledExceptionThrowable(ModuleCrashTests.java:"));
+            "\tat ly.count.android.sdk.ModuleCrashTests.recordUnhandledExceptionThrowable(ModuleCrashTests.java:"));
     }
 
     @Test(expected = StackOverflowError.class)

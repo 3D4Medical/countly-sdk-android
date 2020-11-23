@@ -2,18 +2,20 @@ package ly.count.android.sdk;
 
 import android.app.Application;
 import android.content.Context;
-
 import java.util.Map;
 
 public class CountlyConfig {
 
     /**
-     * Internal fields for testing
+     * Internal fields and fields for testing
      */
 
     protected CountlyStore countlyStore = null;
 
     protected boolean checkForNativeCrashDumps = true;
+
+    //used to deliver this object to connection queue
+    protected DeviceId deviceIdInstance = null;
 
     /**
      * Android context.
@@ -147,10 +149,23 @@ public class CountlyConfig {
     public CountlyConfig() {
     }
 
+    /**
+     * @param context
+     * @param appKey
+     * @param serverURL
+     * @deprecated Please use the constructor that takes the application class
+     */
     public CountlyConfig(Context context, String appKey, String serverURL) {
         setContext(context);
         setAppKey(appKey);
         setServerURL(serverURL);
+    }
+
+    public CountlyConfig(Application application, String appKey, String serverURL) {
+        setContext(application.getApplicationContext());
+        setAppKey(appKey);
+        setServerURL(serverURL);
+        setApplication(application);
     }
 
     /**

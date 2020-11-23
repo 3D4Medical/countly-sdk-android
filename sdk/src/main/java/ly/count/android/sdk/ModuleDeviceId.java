@@ -3,6 +3,7 @@ package ly.count.android.sdk;
 import android.util.Log;
 
 class ModuleDeviceId extends ModuleBase {
+    boolean exitTempIdAfterInit = false;
 
     ModuleDeviceId(Countly cly, CountlyConfig config) {
         super(cly);
@@ -10,9 +11,45 @@ class ModuleDeviceId extends ModuleBase {
         if (_cly.isLoggingEnabled()) {
             Log.v(Countly.TAG, "[ModuleDeviceId] Initialising");
         }
+
+        boolean customIDWasProvided = (config.deviceID != null);
+        if (config.temporaryDeviceIdEnabled && !customIDWasProvided) {
+            //if we want to use temporary ID mode and no developer custom ID is provided
+            //then we override that custom ID to set the temporary mode
+            config.deviceID = DeviceId.temporaryCountlyDeviceId;
+        }
+
+        //choose what kind of device ID will be used
+        if (config.deviceID != null) {
+            //if the developer provided a ID
+            //or it's a temporary ID
+            config.deviceIdInstance = new DeviceId(config.countlyStore, config.deviceID);
+        } else {
+            //the dev provided only a type and the SDK should generate a appropriate ID
+            config.deviceIdInstance = new DeviceId(config.countlyStore, config.idMode);
+        }
+
+        //initialise the set device ID value
+        config.deviceIdInstance.init(config.context, config.countlyStore, true);
+
+        boolean temporaryDeviceIdIsCurrentlyEnabled = config.deviceIdInstance.temporaryIdModeEnabled();
+        if (_cly.isLoggingEnabled()) {
+            Log.d(Countly.TAG, "[ModuleDeviceId] [TemporaryDeviceId] Temp ID should be enabled[" + config.temporaryDeviceIdEnabled + "] Currently enabled: [" + temporaryDeviceIdIsCurrentlyEnabled + "]");
+        }
+
+        if(temporaryDeviceIdIsCurrentlyEnabled && customIDWasProvided) {
+            //if a custom ID was provided and we are still in temporary ID mode
+            //it means the we had tempID mode at the previous app end
+            //exit tempID after init finished
+            if (_cly.isLoggingEnabled()) {
+                Log.d(Countly.TAG, "[ModuleDeviceId] [TemporaryDeviceId] Decided we have to exit temporary device ID mode, mode enabled: [" + config.temporaryDeviceIdEnabled + "], custom Device ID Set: [" + customIDWasProvided + "]");
+            }
+
+            exitTempIdAfterInit = true;
+        }
     }
 
-    private void exitTemporaryIdMode(DeviceId.Type type, String deviceId) {
+    void exitTemporaryIdMode(DeviceId.Type type, String deviceId) {
         if (_cly.isLoggingEnabled()) {
             Log.d(Countly.TAG, "[ModuleDeviceId] Calling exitTemporaryIdMode");
         }
@@ -69,6 +106,14 @@ class ModuleDeviceId extends ModuleBase {
             throw new IllegalStateException("WHen type is 'DEVELOPER_SUPPLIED', provided deviceId cannot be null");
         }
 
+        if(!_cly.anyConsentGiven() && type != DeviceId.Type.TEMPORARY_ID){
+            //if we are not trying to set a temporary id, consent has to be given
+            if (_cly.isLoggingEnabled()) {
+                Log.e(Countly.TAG, "[ModuleDeviceId] Can't change Device ID if no consent is given");
+            }
+            return;
+        }
+
         DeviceId currentDeviceId = _cly.connectionQueue_.getDeviceId();
 
         if (currentDeviceId.temporaryIdModeEnabled() && (deviceId != null && deviceId.equals(DeviceId.temporaryCountlyDeviceId))) {
@@ -113,6 +158,13 @@ class ModuleDeviceId extends ModuleBase {
             throw new IllegalStateException("deviceId cannot be null or empty");
         }
 
+        if(!_cly.anyConsentGiven()){
+            if (_cly.isLoggingEnabled()) {
+                Log.e(Countly.TAG, "[ModuleDeviceId] Can't change Device ID if no consent is given");
+            }
+            return;
+        }
+
         if (_cly.connectionQueue_.getDeviceId().temporaryIdModeEnabled() || _cly.connectionQueue_.queueContainsTemporaryIdItems()) {
             //if we are in temporary ID mode or
             //at some moment have enabled temporary mode
@@ -122,7 +174,7 @@ class ModuleDeviceId extends ModuleBase {
                 //just exit, nothing to do
 
                 if (_cly.isLoggingEnabled()) {
-                    Log.w(Countly.TAG, "[changeDeviceId] About to enter temporary ID mode when already in it");
+                    Log.w(Countly.TAG, "[ModuleDeviceId, changeDeviceId] About to enter temporary ID mode when already in it");
                 }
 
                 return;
@@ -140,6 +192,16 @@ class ModuleDeviceId extends ModuleBase {
             _cly.moduleRemoteConfig.clearAndDownloadAfterIdChange();
 
             _cly.connectionQueue_.changeDeviceId(deviceId, _cly.moduleSessions.roundedSecondsSinceLastSessionDurationUpdate());
+        }
+    }
+
+    @Override
+    public void initFinished(CountlyConfig config){
+        if(exitTempIdAfterInit) {
+            if (_cly.isLoggingEnabled()) {
+                Log.i(Countly.TAG, "[ModuleDeviceId, initFinished] Exiting temp ID at the end of init");
+            }
+            exitTemporaryIdMode(DeviceId.Type.DEVELOPER_SUPPLIED, config.deviceID);
         }
     }
 

@@ -3,22 +3,16 @@ package ly.count.android.demo;
 import android.app.Activity;
 import android.content.res.Configuration;
 import android.os.Bundle;
-import android.util.Log;
 import android.view.View;
-import android.widget.Toast;
 
-import java.util.Random;
-import java.util.regex.Pattern;
+import androidx.appcompat.app.AppCompatActivity;
 
 import ly.count.android.sdk.Countly;
 import ly.count.android.sdk.CountlyConfig;
-import ly.count.android.sdk.CountlyStarRating;
-import ly.count.android.sdk.CrashFilterCallback;
 import ly.count.android.sdk.DeviceId;
-import ly.count.android.sdk.RemoteConfig;
 
 @SuppressWarnings("UnusedParameters")
-public class ActivityExampleOthers extends Activity {
+public class ActivityExampleOthers extends AppCompatActivity {
     Activity activity;
 
     @Override
@@ -32,7 +26,7 @@ public class ActivityExampleOthers extends Activity {
     public void onClickViewOther05(View v) {
         //set user location
         String countryCode = "us";
-        String city = "Houston";
+        String city = "Höuston";
         String latitude = "29.634933";
         String longitude = "-95.220255";
         String ipAddress = null;

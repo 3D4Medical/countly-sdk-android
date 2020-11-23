@@ -28,22 +28,17 @@ import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.Display;
 import android.view.WindowManager;
-
-import java.util.Map;
-import org.json.JSONException;
-import org.json.JSONObject;
-
 import java.io.UnsupportedEncodingException;
 import java.util.Date;
 import java.util.Locale;
+import java.util.Map;
 import java.util.TimeZone;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 /**
  * This class provides several static methods to retrieve information about
  * the current device and operating environment.
- *
- * It is important to call setDeviceID early, before logging any session or custom
- * event data.
  */
 class DeviceInfo {
     /**
@@ -222,6 +217,23 @@ class DeviceInfo {
     }
 
     /**
+     * Returns what kind of device this is. The potential values are:
+     * ["console", "mobile", "tablet", "smarttv", "wearable", "embedded", "desktop"]
+     * Currently the Android SDK differentiates between ["mobile", "tablet", "smarttv"]
+     */
+    static String getDeviceType(final Context context) {
+        if (Utils.isDeviceTv(context)) {
+            return "smarttv";
+        }
+
+        if (Utils.isDeviceTablet(context)) {
+            return "tablet";
+        }
+
+        return "mobile";
+    }
+
+    /**
      * Returns a URL-encoded JSON string containing the device metrics
      * to be associated with a begin session event.
      * See the following link for more info:
@@ -240,13 +252,14 @@ class DeviceInfo {
             "_locale", getLocale(),
             "_app_version", getAppVersion(context),
             "_store", getStore(context),
-            "_deep_link", deepLink);
+            "_deep_link", deepLink,
+            "_device_type", getDeviceType(context));
 
         //override metric values
-        if(metricOverride != null) {
+        if (metricOverride != null) {
             for (String k : metricOverride.keySet()) {
                 if (k == null || k.length() == 0) {
-                    if(Countly.sharedInstance().isLoggingEnabled()){
+                    if (Countly.sharedInstance().isLoggingEnabled()) {
                         Log.w(Countly.TAG, "Provided metric override key can't be null or empty");
                     }
                     continue;
@@ -255,7 +268,7 @@ class DeviceInfo {
                 String overrideValue = metricOverride.get(k);
 
                 if (overrideValue == null) {
-                    if(Countly.sharedInstance().isLoggingEnabled()){
+                    if (Countly.sharedInstance().isLoggingEnabled()) {
                         Log.w(Countly.TAG, "Provided metric override value can't be null, key:[" + k + "]");
                     }
                     continue;
@@ -263,7 +276,7 @@ class DeviceInfo {
 
                 try {
                     json.put(k, overrideValue);
-                } catch (Exception ex){
+                } catch (Exception ex) {
                     Log.e(Countly.TAG, "Could not set metric override, [" + ex + "]");
                 }
             }

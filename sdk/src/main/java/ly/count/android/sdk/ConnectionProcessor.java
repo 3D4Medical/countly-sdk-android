@@ -22,7 +22,6 @@ THE SOFTWARE.
 package ly.count.android.sdk;
 
 import android.util.Log;
-
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
@@ -35,7 +34,6 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLConnection;
 import java.util.Map;
-
 import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLContext;
 import org.json.JSONException;
@@ -261,7 +259,7 @@ public class ConnectionProcessor implements Runnable {
                         }
                     } else {
                         //new device_id provided, make sure it will be merged
-                        eventData = storedEvents[0] + "&old_device_id=" + deviceId_.getId();
+                        eventData = storedEvents[0] + "&old_device_id=" + UtilsNetworking.urlEncodeString(deviceId_.getId());
                     }
                 } else {
                     // this branch will be used in almost all requests.
@@ -306,7 +304,7 @@ public class ConnectionProcessor implements Runnable {
 
                     if (responseCode >= 200 && responseCode < 300) {
 
-                        if (responseString.isEmpty()){
+                        if (responseString.isEmpty()) {
                             if (Countly.sharedInstance().isLoggingEnabled()) {
                                 Log.v(Countly.TAG, "[Connection Processor] Response was empty, will retry");
                             }
@@ -315,7 +313,7 @@ public class ConnectionProcessor implements Runnable {
                             JSONObject jsonObject;
                             try {
                                 jsonObject = new JSONObject(responseString);
-                            } catch (JSONException ex){
+                            } catch (JSONException ex) {
                                 //failed to parse, so not a valid json
                                 jsonObject = null;
                             }
@@ -327,7 +325,7 @@ public class ConnectionProcessor implements Runnable {
                                 }
                                 rRes = RequestResult.RETRY;
                             } else {
-                                if(jsonObject.has("result")){
+                                if (jsonObject.has("result")) {
                                     //contains result entry
                                     if (Countly.sharedInstance().isLoggingEnabled()) {
                                         Log.v(Countly.TAG, "[Connection Processor] Response was a success");

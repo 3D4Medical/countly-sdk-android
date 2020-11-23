@@ -1,7 +1,6 @@
 package ly.count.android.sdk;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
-
 import org.json.JSONException;
 import org.junit.Before;
 import org.junit.Test;
@@ -11,7 +10,7 @@ import org.junit.runner.RunWith;
 public class RemoteConfigTests {
 
     @Before
-    public void setUp(){
+    public void setUp() {
         Countly.sharedInstance().setLoggingEnabled(true);
     }
 

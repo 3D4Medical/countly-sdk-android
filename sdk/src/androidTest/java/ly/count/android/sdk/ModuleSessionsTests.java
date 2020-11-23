@@ -1,17 +1,10 @@
 package ly.count.android.sdk;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
-
 import org.junit.After;
-import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
 import static androidx.test.InstrumentationRegistry.getContext;
 import static org.mockito.Mockito.mock;
@@ -37,7 +30,7 @@ public class ModuleSessionsTests {
     }
 
     @Test
-    public void manualSessionBegin(){
+    public void manualSessionBegin() {
         Countly mCountly = new Countly();
         CountlyConfig config = (new CountlyConfig(getContext(), "appkey", "http://test.count.ly")).setDeviceId("1234").setLoggingEnabled(true).enableCrashReporting().enableManualSessionControl();
 
@@ -47,7 +40,7 @@ public class ModuleSessionsTests {
 
         mCountly.sessions().beginSession();
 
-        verify(connectionQueue, times(1)).beginSession();
+        verify(connectionQueue, times(1)).beginSession(false, null, null, null, null);
     }
 
     @Test
@@ -60,7 +53,7 @@ public class ModuleSessionsTests {
         mCountly.setConnectionQueue(connectionQueue);
 
         mCountly.sessions().beginSession();
-        verify(connectionQueue, times(1)).beginSession();
+        verify(connectionQueue, times(1)).beginSession(false, null, null, null, null);
 
         Thread.sleep(1000);
         mCountly.sessions().updateSession();
@@ -69,7 +62,6 @@ public class ModuleSessionsTests {
         Thread.sleep(2000);
         mCountly.sessions().endSession();
         verify(connectionQueue, times(1)).endSession(2, null);
-
     }
 
     @Test
@@ -82,7 +74,7 @@ public class ModuleSessionsTests {
         mCountly.setConnectionQueue(connectionQueue);
 
         mCountly.sessions().beginSession();
-        verify(connectionQueue, never()).beginSession();
+        verify(connectionQueue, never()).beginSession(false, null, null, null, null);
 
         Thread.sleep(1000);
         mCountly.sessions().updateSession();
@@ -104,7 +96,7 @@ public class ModuleSessionsTests {
 
         mCountly.onStart(null);
 
-        verify(connectionQueue, never()).beginSession();
+        verify(connectionQueue, never()).beginSession(false, null, null, null, null);
         Thread.sleep(1000);
 
         mCountly.onStop();
@@ -123,7 +115,7 @@ public class ModuleSessionsTests {
 
         mCountly.onStart(null);
 
-        verify(connectionQueue, times(1)).beginSession();
+        verify(connectionQueue, times(1)).beginSession(false, null, null, null, null);
         Thread.sleep(1000);
 
         mCountly.onStop();

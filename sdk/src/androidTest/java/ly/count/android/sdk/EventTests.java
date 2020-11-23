@@ -22,25 +22,27 @@ THE SOFTWARE.
 package ly.count.android.sdk;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
-
-import org.json.JSONException;
-import org.json.JSONObject;
-
 import java.util.HashMap;
 import java.util.Map;
-
-import static org.junit.Assert.*;
-
+import org.json.JSONException;
+import org.json.JSONObject;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 @RunWith(AndroidJUnit4.class)
 @SuppressWarnings("ConstantConditions")
 public class EventTests {
 
     @Before
-    public void setUp(){
+    public void setUp() {
         Countly.sharedInstance().setLoggingEnabled(true);
     }
 
@@ -378,7 +380,7 @@ public class EventTests {
 
     @Test
     public void testSegmentationSorter() {
-        String[] keys = new String[]{"a", "b", "c", "d", "e", "f", "l", "r"};
+        String[] keys = new String[] { "a", "b", "c", "d", "e", "f", "l", "r" };
 
         Map<String, Object> automaticViewSegmentation = new HashMap<>();
 
@@ -418,12 +420,12 @@ public class EventTests {
 
     @Test
     public void testSegmentationSorterReminder() {
-        String[] keys = new String[]{"a", "b", "c", "d", "e", "f", "l", "r"};
+        String[] keys = new String[] { "a", "b", "c", "d", "e", "f", "l", "r" };
 
         Map<String, Object> automaticViewSegmentation = new HashMap<>();
 
         Object obj = new Object();
-        int[] arr = new int[] {1, 2, 3};
+        int[] arr = new int[] { 1, 2, 3 };
 
         automaticViewSegmentation.put(keys[0], 2);
         automaticViewSegmentation.put(keys[1], 12.2f);

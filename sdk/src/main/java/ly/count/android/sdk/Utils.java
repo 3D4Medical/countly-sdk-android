@@ -1,11 +1,9 @@
 package ly.count.android.sdk;
 
-import android.app.Activity;
 import android.app.UiModeManager;
 import android.content.Context;
 import android.content.res.Configuration;
 import android.os.Build;
-import android.util.DisplayMetrics;
 import android.util.Log;
 
 import java.util.ArrayList;
@@ -32,11 +30,11 @@ import static android.content.Context.UI_MODE_SERVICE;
 public class Utils {
     private static final ExecutorService bg = Executors.newSingleThreadExecutor();
 
-    public static Future<?> runInBackground (Runnable runnable) {
+    public static Future<?> runInBackground(Runnable runnable) {
         return bg.submit(runnable);
     }
 
-    public static <T> Future<T> runInBackground (Callable<T> runnable) {
+    public static <T> Future<T> runInBackground(Callable<T> runnable) {
         return bg.submit(runnable);
     }
 
@@ -110,7 +108,7 @@ public class Utils {
             return bytes.toByteArray();
         } catch (IOException e) {
             if (Countly.sharedInstance().isLoggingEnabled()) {
-                Log.e("Countly", "Couldn't read stream: " + e);
+                Log.e(Countly.TAG, "Couldn't read stream: " + e);
             }
             return null;
         } finally {
@@ -204,7 +202,7 @@ public class Utils {
 
         if (removed) {
             if (Countly.sharedInstance().isLoggingEnabled()) {
-                Log.w("Countly", "Unsupported data types were removed from provided segmentation");
+                Log.w(Countly.TAG, "Unsupported data types were removed from provided segmentation");
             }
         }
 
@@ -326,25 +324,12 @@ public class Utils {
     /**
      * Used for detecting if current device is a tablet of phone
      */
-    protected static boolean isDeviceTablet(Activity activity) {
-        boolean device_large = ((activity.getResources().getConfiguration().screenLayout &
-            Configuration.SCREENLAYOUT_SIZE_MASK) ==
-            Configuration.SCREENLAYOUT_SIZE_LARGE);
-
-        if (device_large) {
-            DisplayMetrics metrics = new DisplayMetrics();
-            activity.getWindowManager().getDefaultDisplay().getMetrics(metrics);
-
-            //noinspection RedundantIfStatement
-            if (metrics.densityDpi == DisplayMetrics.DENSITY_DEFAULT
-                || metrics.densityDpi == DisplayMetrics.DENSITY_HIGH
-                || metrics.densityDpi == DisplayMetrics.DENSITY_MEDIUM
-                || metrics.densityDpi == DisplayMetrics.DENSITY_TV
-                || metrics.densityDpi == DisplayMetrics.DENSITY_XHIGH) {
-                return true;
-            }
+    static boolean isDeviceTablet(Context context) {
+        if (context == null) {
+            return false;
         }
-        return false;
+
+        return (context.getResources().getConfiguration().screenLayout & Configuration.SCREENLAYOUT_SIZE_MASK) >= Configuration.SCREENLAYOUT_SIZE_LARGE;
     }
 
     /**
@@ -353,10 +338,16 @@ public class Utils {
      * @return
      */
     @SuppressWarnings("RedundantIfStatement")
-    protected static boolean isDeviceTv(Context context) {
-        final String TAG = "DeviceTypeRuntimeCheck";
+    static boolean isDeviceTv(Context context) {
+        if (context == null) {
+            return false;
+        }
 
         UiModeManager uiModeManager = (UiModeManager) context.getSystemService(UI_MODE_SERVICE);
+
+        if (uiModeManager == null) {
+            return false;
+        }
 
         if (uiModeManager.getCurrentModeType() == Configuration.UI_MODE_TYPE_TELEVISION) {
             return true;

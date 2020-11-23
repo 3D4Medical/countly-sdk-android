@@ -1,7 +1,8 @@
 package ly.count.android.sdk;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
-
+import java.util.HashMap;
+import java.util.Map;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -9,18 +10,9 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
 import static androidx.test.InstrumentationRegistry.getContext;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.booleanThat;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 @RunWith(AndroidJUnit4.class)
@@ -38,7 +30,6 @@ public class ModuleAPMTests {
 
         connectionQueue = mock(ConnectionQueue.class);
         mCountly.setConnectionQueue(connectionQueue);
-
     }
 
     @After
@@ -71,7 +62,7 @@ public class ModuleAPMTests {
 
         customMetrics.put("a11", 2);
 
-        for(String key:ModuleAPM.reservedKeys) {
+        for (String key : ModuleAPM.reservedKeys) {
             customMetrics.put(key, 4);
         }
 
@@ -105,7 +96,6 @@ public class ModuleAPMTests {
         customMetrics.put("a114", 21);
         customMetrics.put("a1__f1", 24);
 
-
         ModuleAPM.removeReservedInvalidKeys(customMetrics);
 
         Assert.assertEquals(5, customMetrics.size());
@@ -119,19 +109,19 @@ public class ModuleAPMTests {
     public void recordNetworkTraceBasic() {
         //ArgumentCaptor<String> arg = ArgumentCaptor.forClass(String.class);
         mCountly.apm().recordNetworkTrace("aaa", 234, 123, 456, 7654, 8765);
-        verify(connectionQueue).sendAPMNetworkTrace("aaa", (8765L - 7654L),234, 123, 456, 7654L, 8765L);
+        verify(connectionQueue).sendAPMNetworkTrace("aaa", (8765L - 7654L), 234, 123, 456, 7654L, 8765L);
     }
 
     @Test
     public void recordNetworkTraceFalseValues_1() {
         mCountly.apm().recordNetworkTrace("aaa", -100, -123, 456, 7654, 8765);
-        verify(connectionQueue).sendAPMNetworkTrace("aaa", (8765L - 7654L),0, 0, 456, 7654L, 8765L);
+        verify(connectionQueue).sendAPMNetworkTrace("aaa", (8765L - 7654L), 0, 0, 456, 7654L, 8765L);
     }
 
     @Test
     public void recordNetworkTraceFalseValues_2() {
         mCountly.apm().recordNetworkTrace("aaa", 999, 123, -456, 8765, 7654);
-        verify(connectionQueue).sendAPMNetworkTrace("aaa", (8765L - 7654L),0, 123, 0, 7654L, 8765L);
+        verify(connectionQueue).sendAPMNetworkTrace("aaa", (8765L - 7654L), 0, 123, 0, 7654L, 8765L);
     }
 
     @Test

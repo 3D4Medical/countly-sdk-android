@@ -23,11 +23,7 @@ package ly.count.android.sdk;
 
 import android.content.Context;
 import android.content.SharedPreferences;
-
 import android.util.Log;
-import org.json.JSONException;
-import org.json.JSONObject;
-
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -35,6 +31,8 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 /**
  * This class provides a persistence layer for the local event &amp; connection queues.
@@ -55,11 +53,6 @@ public class CountlyStore {
     private static final String DELIMITER = ":::";
     private static final String CONNECTIONS_PREFERENCE = "CONNECTIONS";
     private static final String EVENTS_PREFERENCE = "EVENTS";
-    private static final String LOCATION_CITY_PREFERENCE = "LOCATION_CITY";
-    private static final String LOCATION_COUNTRY_CODE_PREFERENCE = "LOCATION_COUNTRY_CODE";
-    private static final String LOCATION_IP_ADDRESS_PREFERENCE = "LOCATION_IP_ADDRESS";
-    private static final String LOCATION_GPS_PREFERENCE = "LOCATION";
-    private static final String LOCATION_DISABLED_PREFERENCE = "LOCATION_DISABLED";
     private static final String STAR_RATING_PREFERENCE = "STAR_RATING";
     private static final String CACHED_ADVERTISING_ID = "ADVERTISING_ID";
     private static final String REMOTE_CONFIG_VALUES = "REMOTE_CONFIG";
@@ -68,7 +61,7 @@ public class CountlyStore {
     private static final String CACHED_PUSH_MESSAGING_MODE = "PUSH_MESSAGING_MODE";
     private static final String CACHED_PUSH_MESSAGING_PROVIDER = "PUSH_MESSAGING_PROVIDER";
     private static final int MAX_EVENTS = 100;
-    private static final int MAX_REQUESTS = 1000;
+    static int MAX_REQUESTS = 1000;//value is configurable for tests
 
     private final SharedPreferences preferences_;
     private final SharedPreferences preferencesPush_;
@@ -167,7 +160,7 @@ public class CountlyStore {
         }
     }
 
-    private synchronized void deleteOldestRequest(){
+    synchronized void deleteOldestRequest() {
         final List<String> connections = new ArrayList<>(Arrays.asList(connections()));
         connections.remove(0);
         preferences_.edit().putString(CONNECTIONS_PREFERENCE, join(connections, DELIMITER)).apply();
@@ -191,7 +184,13 @@ public class CountlyStore {
     protected synchronized void replaceConnections(final String[] newConns) {
         if (newConns != null) {
             final List<String> connections = new ArrayList<>(Arrays.asList(newConns));
-            preferences_.edit().putString(CONNECTIONS_PREFERENCE, join(connections, DELIMITER)).apply();
+            replaceConnectionsList(connections);
+        }
+    }
+
+    protected synchronized void replaceConnectionsList(final List<String> newConns) {
+        if (newConns != null) {
+            preferences_.edit().putString(CONNECTIONS_PREFERENCE, join(newConns, DELIMITER)).apply();
         }
     }
 
@@ -206,52 +205,6 @@ public class CountlyStore {
             events.add(event);
             preferences_.edit().putString(EVENTS_PREFERENCE, joinEvents(events, DELIMITER)).apply();
         }
-    }
-
-    /**
-     * Sets location of user and sends it with next request
-     */
-    void setLocationGpsCoordinates(final String latLonCoordinates) {
-        preferences_.edit().putString(LOCATION_GPS_PREFERENCE, latLonCoordinates).apply();
-    }
-
-    void setLocationCity(final String city) {
-        preferences_.edit().putString(LOCATION_CITY_PREFERENCE, city).apply();
-    }
-
-    void setLocationCountryCode(final String countryCode) {
-        preferences_.edit().putString(LOCATION_COUNTRY_CODE_PREFERENCE, countryCode).apply();
-    }
-
-    void setLocationIpAddress(final String ipAddress) {
-        preferences_.edit().putString(LOCATION_IP_ADDRESS_PREFERENCE, ipAddress).apply();
-    }
-
-    void setLocationDisabled(final boolean locationDisabled) {
-        preferences_.edit().putBoolean(LOCATION_DISABLED_PREFERENCE, locationDisabled).apply();
-    }
-
-    /**
-     * Get location or empty string in case if no location is specified
-     */
-    String getLocation() {
-        return preferences_.getString(LOCATION_GPS_PREFERENCE, null);
-    }
-
-    String getLocationCity() {
-        return preferences_.getString(LOCATION_CITY_PREFERENCE, null);
-    }
-
-    String getLocationCountryCode() {
-        return preferences_.getString(LOCATION_COUNTRY_CODE_PREFERENCE, null);
-    }
-
-    String getLocationIpAddress() {
-        return preferences_.getString(LOCATION_IP_ADDRESS_PREFERENCE, null);
-    }
-
-    boolean getLocationDisabled() {
-        return preferences_.getBoolean(LOCATION_DISABLED_PREFERENCE, false);
     }
 
     /**
@@ -290,6 +243,11 @@ public class CountlyStore {
 
     Boolean getConsentPush() {
         return preferencesPush_.getBoolean(CONSENT_GCM_PREFERENCES, false);
+    }
+
+    public static Boolean getConsentPushNoInit(Context context) {
+        SharedPreferences sp = createPreferencesPush(context);
+        return sp.getBoolean(CONSENT_GCM_PREFERENCES, false);
     }
 
     /**
@@ -366,7 +324,7 @@ public class CountlyStore {
         return res;
     }
 
-    void clearCachedPushData(){
+    void clearCachedPushData() {
         preferencesPush_.edit().remove(CACHED_PUSH_ACTION_ID).apply();
         preferencesPush_.edit().remove(CACHED_PUSH_ACTION_INDEX).apply();
     }
@@ -438,5 +396,7 @@ public class CountlyStore {
         prefsEditor.remove(CONNECTIONS_PREFERENCE);
         prefsEditor.clear();
         prefsEditor.apply();
+
+        preferencesPush_.edit().clear().apply();
     }
 }

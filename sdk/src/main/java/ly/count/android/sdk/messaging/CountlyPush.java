@@ -8,6 +8,7 @@ import android.app.Notification;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -27,7 +28,6 @@ import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
-
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -36,7 +36,7 @@ import java.net.URL;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
+import ly.count.android.sdk.BuildConfig;
 import ly.count.android.sdk.Countly;
 import ly.count.android.sdk.CountlyStore;
 import ly.count.android.sdk.Utils;
@@ -50,7 +50,8 @@ public class CountlyPush {
     public static final String EXTRA_MESSAGE = "ly.count.android.sdk.CountlyPush.message";
     public static final String EXTRA_INTENT = "ly.count.android.sdk.CountlyPush.intent";
     public static final String CHANNEL_ID = "ly.count.android.sdk.CountlyPush.CHANNEL_ID";
-    public static final String NOTIFICATION_BROADCAST = "ly.count.android.sdk.CountlyPush.NOTIFICATION_BROADCAST";
+    public static final String SECURE_NOTIFICATION_BROADCAST = "ly.count.android.sdk.CountlyPush.SECURE_NOTIFICATION_BROADCAST";
+    public static final String COUNTLY_BROADCAST_PERMISSION_POSTFIX = ".CountlyPush.BROADCAST_PERMISSION";
 
     private static Application.ActivityLifecycleCallbacks callbacks = null;
     private static Activity activity = null;
@@ -59,6 +60,16 @@ public class CountlyPush {
     private static Countly.CountlyMessagingProvider provider = null;
 
     static Integer notificationAccentColor = null;
+
+    /**
+     * Read & connection timeout for rich push media download
+     */
+    static int MEDIA_DOWNLOAD_TIMEOUT = 15000;
+
+    /**
+     * Maximum attempts to download a media for a rich push
+     */
+    static int MEDIA_DOWNLOAD_ATTEMPTS = 3;
 
     @SuppressWarnings("FieldCanBeLocal")
     private static BroadcastReceiver notificationActionReceiver = null, consentReceiver = null;
@@ -228,6 +239,45 @@ public class CountlyPush {
             broadcast.setExtrasClassLoader(CountlyPush.class.getClassLoader());
 
             Intent intent = broadcast.getParcelableExtra(EXTRA_INTENT);
+
+            if (intent == null) {
+                if (Countly.sharedInstance().isLoggingEnabled()) {
+                    Log.w(Countly.TAG, "[CountlyPush, NotificationBroadcastReceiver] Received a null Intent, stopping execution");
+                }
+                return;
+            }
+
+            int flags = intent.getFlags();
+            if (((flags & Intent.FLAG_GRANT_READ_URI_PERMISSION) != 0) || ((flags & Intent.FLAG_GRANT_WRITE_URI_PERMISSION) != 0)) {
+                if (Countly.sharedInstance().isLoggingEnabled()) {
+                    Log.w(Countly.TAG, "[CountlyPush, NotificationBroadcastReceiver] Attempt to get URI permissions");
+                }
+                return;
+            }
+            ComponentName componentName = intent.getComponent();
+            String intentPackageName = componentName.getPackageName();
+            String intentClassName = componentName.getClassName();
+            String contextPackageName = context.getPackageName();
+
+            if (!intentPackageName.equals(contextPackageName)) {
+                if (Countly.sharedInstance().isLoggingEnabled()) {
+                    Log.w(Countly.TAG, "[CountlyPush, NotificationBroadcastReceiver] Untrusted intent package");
+                }
+                return;
+            }
+            if (!intentClassName.startsWith(intentPackageName)) {
+                if (Countly.sharedInstance().isLoggingEnabled()) {
+                    Log.w(Countly.TAG, "[CountlyPush, NotificationBroadcastReceiver] Just to ensure it passes validation");
+                }
+                return;
+            }
+
+            if (Countly.sharedInstance().isLoggingEnabled()) {
+                if (Countly.sharedInstance().isLoggingEnabled()) {
+                    Log.d(Countly.TAG, "[CountlyPush, NotificationBroadcastReceiver] Push broadcast, after filtering");
+                }
+            }
+
             intent.setExtrasClassLoader(CountlyPush.class.getClassLoader());
 
             int index = intent.getIntExtra(EXTRA_ACTION_INDEX, 0);
@@ -276,12 +326,6 @@ public class CountlyPush {
                 i.putExtra(EXTRA_ACTION_INDEX, index);
                 context.startActivity(i);
             }
-
-            //            final NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
-            //            if (manager != null) {
-            //                Log.d("cly", message.id() + ", code: " + message.hashCode());
-            //                manager.cancel(message.hashCode());
-            //            }
         }
     }
 
@@ -291,7 +335,7 @@ public class CountlyPush {
     public static class ConsentBroadcastReceiver extends BroadcastReceiver {
         @Override
         public void onReceive(Context context, Intent broadcast) {
-            if (mode != null && provider != null && Countly.sharedInstance().getConsent(Countly.CountlyFeatureNames.push)) {
+            if (mode != null && provider != null && getPushConsent(context)) {
                 String token = getToken(context, provider);
                 if (token != null && !"".equals(token)) {
                     onTokenRefresh(token, provider);
@@ -389,7 +433,7 @@ public class CountlyPush {
      * @return {@code Boolean.TRUE} if displayed successfully, {@code Boolean.FALSE} if cannot display now, {@code null} if message is not displayable as {@link Notification}
      */
     public static Boolean displayNotification(final Context context, final Message msg, final int notificationSmallIcon, final Intent notificationIntent) {
-        if (!Countly.sharedInstance().getConsent(Countly.CountlyFeatureNames.push)) {
+        if (!getPushConsent(context)) {
             return null;
         }
 
@@ -409,7 +453,7 @@ public class CountlyPush {
             return Boolean.FALSE;
         }
 
-        Intent broadcast = new Intent(NOTIFICATION_BROADCAST);
+        Intent broadcast = new Intent(SECURE_NOTIFICATION_BROADCAST);
         broadcast.putExtra(EXTRA_INTENT, actionIntent(context, notificationIntent, msg, 0));
 
         final Notification.Builder builder = (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O ? new Notification.Builder(context.getApplicationContext(), CHANNEL_ID) : new Notification.Builder(context.getApplicationContext()))
@@ -428,19 +472,15 @@ public class CountlyPush {
         builder.setAutoCancel(true)
             .setContentIntent(PendingIntent.getBroadcast(context, msg.hashCode(), broadcast, 0));
 
-        if (android.os.Build.VERSION.SDK_INT > 16) {
-            builder.setStyle(new Notification.BigTextStyle().bigText(msg.message()).setBigContentTitle(msg.title()));
-        }
+        builder.setStyle(new Notification.BigTextStyle().bigText(msg.message()).setBigContentTitle(msg.title()));
 
         for (int i = 0; i < msg.buttons().size(); i++) {
             Button button = msg.buttons().get(i);
 
-            broadcast = new Intent(NOTIFICATION_BROADCAST);
+            broadcast = new Intent(SECURE_NOTIFICATION_BROADCAST);
             broadcast.putExtra(EXTRA_INTENT, actionIntent(context, notificationIntent, msg, i + 1));
 
-            if (android.os.Build.VERSION.SDK_INT > 16) {
-                builder.addAction(button.icon(), button.title(), PendingIntent.getBroadcast(context, msg.hashCode() + i + 1, broadcast, 0));
-            }
+            builder.addAction(button.icon(), button.title(), PendingIntent.getBroadcast(context, msg.hashCode() + i + 1, broadcast, 0));
         }
 
         if (msg.sound() != null) {
@@ -455,21 +495,17 @@ public class CountlyPush {
             loadImage(context, msg, new BitmapCallback() {
                 @Override
                 public void call(Bitmap bitmap) {
-                    if (android.os.Build.VERSION.SDK_INT > 16) {
-                        if (bitmap != null) {
-                            builder.setStyle(new Notification.BigPictureStyle()
-                                .bigPicture(bitmap)
-                                .setBigContentTitle(msg.title())
-                                .setSummaryText(msg.message()));
-                        }
-                        manager.notify(msg.hashCode(), builder.build());
+                    if (bitmap != null) {
+                        builder.setStyle(new Notification.BigPictureStyle()
+                            .bigPicture(bitmap)
+                            .setBigContentTitle(msg.title())
+                            .setSummaryText(msg.message()));
                     }
+                    manager.notify(msg.hashCode(), builder.build());
                 }
-            });
+            }, 1);
         } else {
-            if (android.os.Build.VERSION.SDK_INT > 16) {
-                manager.notify(msg.hashCode(), builder.build());
-            }
+            manager.notify(msg.hashCode(), builder.build());
         }
 
         return Boolean.TRUE;
@@ -497,7 +533,7 @@ public class CountlyPush {
      * @return {@code Boolean.TRUE} if displayed successfully, {@code Boolean.FALSE} if cannot display now, {@code null} if message is not displayable as {@link Notification}
      */
     public static Boolean displayDialog(final Activity activity, final Message msg) {
-        if (!Countly.sharedInstance().getConsent(Countly.CountlyFeatureNames.push)) {
+        if (!getPushConsent(activity)) {
             return null;
         }
 
@@ -592,7 +628,7 @@ public class CountlyPush {
 
                 builder.create().show();
             }
-        });
+        }, 1);
         return Boolean.TRUE;
     }
 
@@ -645,7 +681,7 @@ public class CountlyPush {
      * @param provider which provider the token belongs to
      */
     public static void onTokenRefresh(String token, Countly.CountlyMessagingProvider provider) {
-        if(!Countly.sharedInstance().isInitialized()){
+        if (!Countly.sharedInstance().isInitialized()) {
             //is some edge cases this might be called before the SDK is initialized
             if (Countly.sharedInstance().isLoggingEnabled()) {
                 Log.i(Countly.TAG, "[CountlyPush, onTokenRefresh] SDK is not initialized, ignoring call");
@@ -653,7 +689,7 @@ public class CountlyPush {
             return;
         }
 
-        if (!Countly.sharedInstance().getConsent(Countly.CountlyFeatureNames.push)) {
+        if (!getPushConsent(null)) {
             if (Countly.sharedInstance().isLoggingEnabled()) {
                 Log.i(Countly.TAG, "[CountlyPush, onTokenRefresh] Consent not given, ignoring call");
             }
@@ -698,6 +734,9 @@ public class CountlyPush {
             throw new IllegalStateException("Non null application must be provided!");
         }
 
+        Log.e(Countly.TAG, "CURRENT PUSH CONSENT " + getPushConsent(application));
+
+
         // set preferred push provider
         CountlyPush.provider = preferredProvider;
         if (provider == null) {
@@ -714,13 +753,13 @@ public class CountlyPush {
 
         // print error in case preferred push provider is not available
         if (provider == Countly.CountlyMessagingProvider.FCM && !UtilsMessaging.reflectiveClassExists(FIREBASE_MESSAGING_CLASS)) {
-            Log.e("Countly", "No FirebaseMessaging class in the class path. Please either add it to your gradle config or don't use CountlyPush.");
+            Log.e(Countly.TAG, "No FirebaseMessaging class in the class path. Please either add it to your gradle config or don't use CountlyPush.");
             return;
         } else if (provider == Countly.CountlyMessagingProvider.HMS && !UtilsMessaging.reflectiveClassExists(HUAWEI_MESSAGING_CLASS)) {
-            Log.e("Countly", "No HmsMessageService class in the class path. Please either add it to your gradle config or don't use CountlyPush.");
+            Log.e(Countly.TAG, "No HmsMessageService class in the class path. Please either add it to your gradle config or don't use CountlyPush.");
             return;
         } else if (provider == null) {
-            Log.e("Countly", "Neither FirebaseMessaging, nor HmsMessageService class in the class path. Please either add Firebase / Huawei dependencies or don't use CountlyPush.");
+            Log.e(Countly.TAG, "Neither FirebaseMessaging, nor HmsMessageService class in the class path. Please either add Firebase / Huawei dependencies or don't use CountlyPush.");
             return;
         }
 
@@ -770,17 +809,17 @@ public class CountlyPush {
             application.registerActivityLifecycleCallbacks(callbacks);
 
             IntentFilter filter = new IntentFilter();
-            filter.addAction(NOTIFICATION_BROADCAST);
+            filter.addAction(SECURE_NOTIFICATION_BROADCAST);
             notificationActionReceiver = new NotificationBroadcastReceiver();
-            application.registerReceiver(notificationActionReceiver, filter);
+            application.registerReceiver(notificationActionReceiver, filter, application.getPackageName() + COUNTLY_BROADCAST_PERMISSION_POSTFIX, null);
 
             filter = new IntentFilter();
             filter.addAction(Countly.CONSENT_BROADCAST);
             consentReceiver = new ConsentBroadcastReceiver();
-            application.registerReceiver(consentReceiver, filter);
+            application.registerReceiver(consentReceiver, filter, application.getPackageName() + COUNTLY_BROADCAST_PERMISSION_POSTFIX, null);
         }
 
-        if (provider == Countly.CountlyMessagingProvider.HMS && Countly.sharedInstance().consent().getConsent(Countly.CountlyFeatureNames.push)) {
+        if (provider == Countly.CountlyMessagingProvider.HMS && getPushConsent(application)) {
             String version = getEMUIVersion();
             if (version.startsWith("10")) {
                 new Thread(new Runnable() {
@@ -796,7 +835,19 @@ public class CountlyPush {
         }
     }
 
-    private static String getEMUIVersion () {
+    static boolean getPushConsent(Context context) {
+        if(Countly.sharedInstance().isInitialized() || context == null) {
+            //todo currently this is also used when context is null and might result in unintended consequences
+            //if SDK is initialised, used the stored value
+            return Countly.sharedInstance().getConsent(Countly.CountlyFeatureNames.push);
+        } else {
+            //if the SDK is not initialised, use the cached value
+            return CountlyStore.getConsentPushNoInit(context);
+        }
+
+    }
+
+    private static String getEMUIVersion() {
         try {
             String line = Build.DISPLAY;
             int spaceIndex = line.indexOf(" ");
@@ -813,9 +864,9 @@ public class CountlyPush {
 
     /**
      * Returns which messaging mode was used in the previous init
-     * -1 - no data / no init has hapened
-     *  0 - test mode
-     *  1 - production mode
+     * -1 - no data / no init has happened
+     * 0 - test mode
+     * 1 - production mode
      */
     public static int getLastMessagingMethod(Context context) {
         return CountlyStore.getLastMessagingMode(context);
@@ -869,7 +920,7 @@ public class CountlyPush {
         void call(Bitmap bitmap);
     }
 
-    private static void loadImage(final Context context, final Message msg, final BitmapCallback callback) {
+    private static void loadImage(final Context context, final Message msg, final BitmapCallback callback, final int attempt) {
         Utils.runInBackground(new Runnable() {
             @Override public void run() {
                 final Bitmap[] bitmap = new Bitmap[] { null };
@@ -880,8 +931,8 @@ public class CountlyPush {
                     try {
                         connection = (HttpURLConnection) msg.media().openConnection();
                         connection.setDoInput(true);
-                        connection.setConnectTimeout(15000);
-                        connection.setReadTimeout(15000);
+                        connection.setConnectTimeout(MEDIA_DOWNLOAD_TIMEOUT);
+                        connection.setReadTimeout(MEDIA_DOWNLOAD_TIMEOUT);
                         connection.connect();
                         input = connection.getInputStream();
                         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
@@ -896,7 +947,10 @@ public class CountlyPush {
                         bitmap[0] = BitmapFactory.decodeByteArray(data, 0, data.length);
                     } catch (Exception e) {
                         System.out.println("Cannot download message media " + e);
-                        bitmap[0] = null;
+                        if (attempt < MEDIA_DOWNLOAD_ATTEMPTS) {
+                            loadImage(context, msg, callback, attempt + 1);
+                            return;
+                        }
                     } finally {
                         if (input != null) {
                             try {

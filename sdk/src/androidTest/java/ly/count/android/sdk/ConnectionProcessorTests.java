@@ -22,7 +22,6 @@ THE SOFTWARE.
 package ly.count.android.sdk;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
-
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -30,14 +29,23 @@ import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLConnection;
-
-import static ly.count.android.sdk.UtilsNetworking.sha256Hash;
-import static org.junit.Assert.*;
-import static org.mockito.Mockito.*;
-
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+
+import static ly.count.android.sdk.UtilsNetworking.sha256Hash;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.anyString;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.isNull;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @RunWith(AndroidJUnit4.class)
 public class ConnectionProcessorTests {
@@ -98,7 +106,11 @@ public class ConnectionProcessorTests {
 
     private static class TestInputStream extends InputStream {
         int readCount = 0;
-        boolean fullyRead() { return readCount >= 2; }
+
+        boolean fullyRead() {
+            return readCount >= 2;
+        }
+
         boolean closed = false;
 
         @Override
@@ -120,7 +132,9 @@ public class ConnectionProcessorTests {
             super(("{\"result\":\"" + result + "\"}").getBytes("UTF-8"));
         }
 
-        boolean fullyRead() { return pos == buf.length; }
+        boolean fullyRead() {
+            return pos == buf.length;
+        }
 
         @Override
         public void close() throws IOException {
@@ -133,7 +147,7 @@ public class ConnectionProcessorTests {
     public void testRun_storeHasSingleConnection() throws IOException {
         final String eventData = "blahblahblah";
         connectionProcessor = spy(connectionProcessor);
-        when(mockStore.connections()).thenReturn(new String[]{eventData}, new String[0]);
+        when(mockStore.connections()).thenReturn(new String[] { eventData }, new String[0]);
         when(mockDeviceId.getId()).thenReturn(testDeviceId);
         final HttpURLConnection mockURLConnection = mock(HttpURLConnection.class);
         final CountlyResponseStream testInputStream = new CountlyResponseStream("Success");
@@ -157,7 +171,7 @@ public class ConnectionProcessorTests {
     public void testRun_storeHasSingleConnection_butHTTPResponseCodeWasNot2xx() throws IOException {
         final String eventData = "blahblahblah";
         connectionProcessor = spy(connectionProcessor);
-        when(mockStore.connections()).thenReturn(new String[]{eventData}, new String[0]);
+        when(mockStore.connections()).thenReturn(new String[] { eventData }, new String[0]);
         when(mockDeviceId.getId()).thenReturn(testDeviceId);
         final HttpURLConnection mockURLConnection = mock(HttpURLConnection.class);
         final CountlyResponseStream testInputStream = new CountlyResponseStream("Success");
@@ -181,7 +195,7 @@ public class ConnectionProcessorTests {
     public void testRun_storeHasSingleConnection_butResponseWasNotJSON() throws IOException {
         final String eventData = "blahblahblah";
         connectionProcessor = spy(connectionProcessor);
-        when(mockStore.connections()).thenReturn(new String[]{eventData}, new String[0]);
+        when(mockStore.connections()).thenReturn(new String[] { eventData }, new String[0]);
         when(mockDeviceId.getId()).thenReturn(testDeviceId);
         final HttpURLConnection mockURLConnection = mock(HttpURLConnection.class);
         final TestInputStream testInputStream = new TestInputStream();
@@ -205,7 +219,7 @@ public class ConnectionProcessorTests {
     public void testRun_storeHasSingleConnection_butResponseJSONWasNotSuccess() throws IOException {
         final String eventData = "blahblahblah";
         connectionProcessor = spy(connectionProcessor);
-        when(mockStore.connections()).thenReturn(new String[]{eventData}, new String[0]);
+        when(mockStore.connections()).thenReturn(new String[] { eventData }, new String[0]);
         when(mockDeviceId.getId()).thenReturn(testDeviceId);
         final HttpURLConnection mockURLConnection = mock(HttpURLConnection.class);
         final CountlyResponseStream testInputStream = new CountlyResponseStream("Failed");
@@ -229,7 +243,7 @@ public class ConnectionProcessorTests {
         final String eventData1 = "blahblahblah";
         final String eventData2 = "123523523432";
         connectionProcessor = spy(connectionProcessor);
-        when(mockStore.connections()).thenReturn(new String[]{eventData1, eventData2}, new String[]{eventData2}, new String[0]);
+        when(mockStore.connections()).thenReturn(new String[] { eventData1, eventData2 }, new String[] { eventData2 }, new String[0]);
         when(mockDeviceId.getId()).thenReturn(testDeviceId);
         final HttpURLConnection mockURLConnection = mock(HttpURLConnection.class);
         final CountlyResponseStream testInputStream1 = new CountlyResponseStream("Success");

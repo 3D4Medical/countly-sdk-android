@@ -25,6 +25,11 @@ public class ModuleConsent extends ModuleBase {
                 _cly.doPushConsentSpecialAction(_cly.delayedPushConsent);
             }
 
+            //remove persistent push flag if no push consent was set
+            if (!_cly.featureConsentValues.containsKey(Countly.CountlyFeatureNames.push)) {
+                _cly.doPushConsentSpecialAction(false);
+            }
+
             //do delayed location erasure, if needed
             if (_cly.delayedLocationErasure) {
                 _cly.doLocationConsentSpecialErasure();
@@ -58,12 +63,14 @@ public class ModuleConsent extends ModuleBase {
          *
          * @return Returns link to Countly for call chaining
          */
-        public synchronized void checkAllConsent() {
-            if (_cly.isLoggingEnabled()) {
-                Log.i(Countly.TAG, "[Consent] calling checkAllConsent");
-            }
+        public void checkAllConsent() {
+            synchronized (_cly) {
+                if (_cly.isLoggingEnabled()) {
+                    Log.i(Countly.TAG, "[Consent] calling checkAllConsent");
+                }
 
-            _cly.checkAllConsent();
+                _cly.checkAllConsent();
+            }
         }
 
         /**
@@ -72,8 +79,10 @@ public class ModuleConsent extends ModuleBase {
          * @param featureName the name of a feature for which consent should be checked
          * @return the consent value
          */
-        public synchronized boolean getConsent(String featureName) {
-            return _cly.getConsent(featureName);
+        public boolean getConsent(String featureName) {
+            synchronized (_cly) {
+                return _cly.getConsent(featureName);
+            }
         }
 
         /**
@@ -81,8 +90,10 @@ public class ModuleConsent extends ModuleBase {
          *
          * @return Returns link to Countly for call chaining
          */
-        public synchronized void removeConsentAll() {
-            _cly.removeConsentAll();
+        public void removeConsentAll() {
+            synchronized (_cly) {
+                _cly.removeConsentAll();
+            }
         }
 
         /**
@@ -91,8 +102,10 @@ public class ModuleConsent extends ModuleBase {
          * @param featureNames the names of features for which consent should be removed
          * @return Returns link to Countly for call chaining
          */
-        public synchronized void removeConsent(String[] featureNames) {
-            _cly.removeConsent(featureNames);
+        public void removeConsent(String[] featureNames) {
+            synchronized (_cly) {
+                _cly.removeConsent(featureNames);
+            }
         }
 
         /**
@@ -100,16 +113,18 @@ public class ModuleConsent extends ModuleBase {
          *
          * @return Returns link to Countly for call chaining
          */
-        public synchronized void giveConsentAll() {
-            if (_cly.isLoggingEnabled()) {
-                Log.i(Countly.TAG, "[Consent] Giving consent for all features");
-            }
+        public void giveConsentAll() {
+            synchronized (_cly) {
+                if (_cly.isLoggingEnabled()) {
+                    Log.i(Countly.TAG, "[Consent] Giving consent for all features");
+                }
 
-            if (_cly.isLoggingEnabled() && !_cly.isInitialized()) {
-                Log.w(Countly.TAG, "[Consent] Calling this before initialising the SDK is deprecated!");
-            }
+                if (_cly.isLoggingEnabled() && !_cly.isInitialized()) {
+                    Log.w(Countly.TAG, "[Consent] Calling this before initialising the SDK is deprecated!");
+                }
 
-            _cly.giveConsent(_cly.validFeatureNames);
+                _cly.giveConsent(_cly.validFeatureNames);
+            }
         }
 
         /**
@@ -118,8 +133,10 @@ public class ModuleConsent extends ModuleBase {
          * @param featureNames the names of features for which consent should be given
          * @return Returns link to Countly for call chaining
          */
-        public synchronized void giveConsent(String[] featureNames) {
-            _cly.giveConsent(featureNames);
+        public void giveConsent(String[] featureNames) {
+            synchronized (_cly) {
+                _cly.giveConsent(featureNames);
+            }
         }
 
         /**
@@ -129,8 +146,10 @@ public class ModuleConsent extends ModuleBase {
          * @param isConsentGiven the consent value that should be set
          * @return Returns link to Countly for call chaining
          */
-        public synchronized void setConsent(String[] featureNames, boolean isConsentGiven) {
-            _cly.setConsent(featureNames, isConsentGiven);
+        public void setConsent(String[] featureNames, boolean isConsentGiven) {
+            synchronized (_cly) {
+                _cly.setConsentInternal(featureNames, isConsentGiven);
+            }
         }
 
         /**
@@ -140,8 +159,10 @@ public class ModuleConsent extends ModuleBase {
          * @param isConsentGiven the value that should be set for this consent group
          * @return Returns link to Countly for call chaining
          */
-        public synchronized void setConsentFeatureGroup(String groupName, boolean isConsentGiven) {
-            _cly.setConsentFeatureGroup(groupName, isConsentGiven);
+        public void setConsentFeatureGroup(String groupName, boolean isConsentGiven) {
+            synchronized (_cly) {
+                _cly.setConsentFeatureGroup(groupName, isConsentGiven);
+            }
         }
 
         /**
@@ -151,8 +172,10 @@ public class ModuleConsent extends ModuleBase {
          * @param features array of feature to be added to the consent group
          * @return Returns link to Countly for call chaining
          */
-        public synchronized void createFeatureGroup(String groupName, String[] features) {
-            _cly.createFeatureGroup(groupName, features);
+        public void createFeatureGroup(String groupName, String[] features) {
+            synchronized (_cly) {
+                _cly.createFeatureGroup(groupName, features);
+            }
         }
     }
 }

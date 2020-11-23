@@ -30,15 +30,14 @@ import android.content.res.Configuration;
 import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
-
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.HashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -52,7 +51,7 @@ import java.util.concurrent.TimeUnit;
 @SuppressWarnings("JavadocReference")
 public class Countly {
 
-    private String DEFAULT_COUNTLY_SDK_VERSION_STRING = "20.04.5";
+    private String DEFAULT_COUNTLY_SDK_VERSION_STRING = "20.11.0";
     /**
      * Used as request meta data on every request
      */
@@ -133,7 +132,6 @@ public class Countly {
     //d - regular SDK internals
     //v - spammy SDK internals
     private boolean enableLogging_;
-    private Countly.CountlyMessagingMode messagingMode_;
     Context context_;
 
     //Internal modules for functionality grouping
@@ -147,6 +145,8 @@ public class Countly {
     ModuleAPM moduleAPM = null;
     ModuleConsent moduleConsent = null;
     ModuleDeviceId moduleDeviceId = null;
+    ModuleLocation moduleLocation = null;
+    ModuleFeedback moduleFeedback = null;
 
     //user data access
     public static UserData userData;
@@ -187,12 +187,14 @@ public class Countly {
     //GDPR
     protected boolean requiresConsent = false;
 
-    private final Map<String, Boolean> featureConsentValues = new HashMap<>();
+    final Map<String, Boolean> featureConsentValues = new HashMap<>();
     private final Map<String, String[]> groupedFeatures = new HashMap<>();
     final List<String> collectedConsentChanges = new ArrayList<>();
 
     Boolean delayedPushConsent = null;//if this is set, consent for push has to be set before finishing init and sending push changes
     boolean delayedLocationErasure = false;//if location needs to be cleared at the end of init
+
+    String[] locationFallback;//temporary used until location can't be set before init
 
     private boolean appLaunchDeepLink = true;
 
@@ -212,7 +214,8 @@ public class Countly {
         public static final String push = "push";
         public static final String starRating = "star-rating";
         public static final String apm = "apm";
-        //public static final String remoteConfig = "remote-config";
+        public static final String feedback = "feedback";
+        public static final String remoteConfig = "remote-config";
         //public static final String accessoryDevices = "accessory-devices";
     }
 
@@ -227,8 +230,9 @@ public class Countly {
         CountlyFeatureNames.users,
         CountlyFeatureNames.push,
         CountlyFeatureNames.starRating,
-        //CountlyFeatureNames.remoteConfig,
-        CountlyFeatureNames.apm
+        CountlyFeatureNames.remoteConfig,
+        CountlyFeatureNames.apm,
+        CountlyFeatureNames.feedback
     };
 
     /**
@@ -247,7 +251,7 @@ public class Countly {
         staticInit();
     }
 
-    private void staticInit(){
+    private void staticInit() {
         connectionQueue_ = new ConnectionQueue();
         Countly.userData = new UserData(connectionQueue_);
         startTimerService(timerService_, timerFuture, TIMER_DELAY_IN_SECONDS);
@@ -289,7 +293,7 @@ public class Countly {
      * @deprecated use {@link CountlyConfig} to pass data to init.
      */
     public Countly init(final Context context, final String serverURL, final String appKey) {
-        return init(context, serverURL, appKey, null, OpenUDIDAdapter.isOpenUDIDAvailable() ? DeviceId.Type.OPEN_UDID : DeviceId.Type.ADVERTISING_ID);
+        return init(context, serverURL, appKey, null, DeviceId.Type.OPEN_UDID);
     }
 
     /**
@@ -403,7 +407,7 @@ public class Countly {
         //react to given consent
         if (config.shouldRequireConsent) {
             setRequiresConsent(true);
-            setConsent(config.enabledFeatureNames, true);
+            setConsentInternal(config.enabledFeatureNames, true);
         }
 
         if (config.serverURL.charAt(config.serverURL.length() - 1) == '/') {
@@ -417,19 +421,25 @@ public class Countly {
             throw new IllegalArgumentException("valid appKey is required, but was provided either 'null' or empty String");
         }
 
+        if (config.application == null) {
+            if (isLoggingEnabled()) {
+                Log.w(Countly.TAG, "[Init] Initialising the SDK without providing the application class is deprecated");
+            }
+        }
+
         if (config.deviceID != null && config.deviceID.length() == 0) {
             //device ID is provided but it's a empty string
             throw new IllegalArgumentException("valid deviceID is required, but was provided as empty String");
         }
-        if (config.deviceID == null && config.idMode == null) {
-            //device ID was not provided and no preferred mode specified. Choosing defaults
-            if (OpenUDIDAdapter.isOpenUDIDAvailable()) {
-                config.idMode = DeviceId.Type.OPEN_UDID;
-            } else if (AdvertisingIdAdapter.isAdvertisingIdAvailable()) config.idMode = DeviceId.Type.ADVERTISING_ID;
+        if (config.idMode == DeviceId.Type.TEMPORARY_ID) {
+            throw new IllegalArgumentException("Temporary_ID type can't be provided during init");
         }
-        if (config.deviceID == null && config.idMode == DeviceId.Type.OPEN_UDID && !OpenUDIDAdapter.isOpenUDIDAvailable()) {
-            //choosing OPEN_UDID as ID type, but it's not available on this device
-            throw new IllegalArgumentException("valid deviceID is required because OpenUDID is not available");
+        if (config.deviceID == null && config.idMode == null) {
+            //device ID was not provided and no preferred mode specified. Choosing default
+            config.idMode = DeviceId.Type.OPEN_UDID;
+        }
+        if (config.idMode == DeviceId.Type.DEVELOPER_SUPPLIED && config.deviceID == null) {
+            throw new IllegalArgumentException("Valid device ID has to be provided with the Developer_Supplied device ID type");
         }
         if (config.deviceID == null && config.idMode == DeviceId.Type.ADVERTISING_ID && !AdvertisingIdAdapter.isAdvertisingIdAvailable()) {
             //choosing advertising ID as type, but it's available on this device
@@ -492,7 +502,18 @@ public class Countly {
                 config.setCountlyStore(countlyStore);
             }
 
+            //check legacy access methods
+            if (locationFallback != null && config.locationCountyCode == null && config.locationCity == null && config.locationLocation == null && config.locationIpAddress == null) {
+                //if the fallback was set and config did not contain any location, use the fallback info
+                // { country_code, city, gpsCoordinates, ipAddress };
+                config.locationCountyCode = locationFallback[0];
+                config.locationCity = locationFallback[1];
+                config.locationLocation = locationFallback[2];
+                config.locationIpAddress = locationFallback[3];
+            }
+
             //initialise modules
+            moduleConsent = new ModuleConsent(this, config);
             moduleDeviceId = new ModuleDeviceId(this, config);
             moduleCrash = new ModuleCrash(this, config);
             moduleEvents = new ModuleEvents(this, config);
@@ -500,34 +521,38 @@ public class Countly {
             moduleRatings = new ModuleRatings(this, config);
             moduleSessions = new ModuleSessions(this, config);
             moduleRemoteConfig = new ModuleRemoteConfig(this, config);
-            moduleConsent = new ModuleConsent(this, config);
             moduleAPM = new ModuleAPM(this, config);
+            moduleLocation = new ModuleLocation(this, config);
+            moduleFeedback = new ModuleFeedback(this, config);
 
             modules.clear();
+            modules.add(moduleConsent);
+            modules.add(moduleDeviceId);
             modules.add(moduleCrash);
             modules.add(moduleEvents);
             modules.add(moduleViews);
             modules.add(moduleRatings);
             modules.add(moduleSessions);
             modules.add(moduleRemoteConfig);
-            modules.add(moduleConsent);
             modules.add(moduleAPM);
-            modules.add(moduleDeviceId);
+            modules.add(moduleLocation);
+            modules.add(moduleFeedback);
 
             if (isLoggingEnabled()) {
                 Log.i(Countly.TAG, "[Init] Finished initialising modules");
             }
 
             //init other things
+            if (isLoggingEnabled()) {
+                Log.d(Countly.TAG, "[Init] Currently cached advertising ID [" + countlyStore.getCachedAdvertisingId() + "]");
+            }
+            AdvertisingIdAdapter.cacheAdvertisingID(config.context, countlyStore);
+
             addCustomNetworkRequestHeaders(config.customNetworkRequestHeaders);
+            setHttpPostForced(config.httpPostForced);
+            enableParameterTamperingProtectionInternal(config.tamperingProtectionSalt);
 
             setPushIntentAddMetadata(config.pushIntentAddMetadata);
-
-            setRemoteConfigAutomaticDownload(config.enableRemoteConfigAutomaticDownload, config.remoteConfigCallback);
-
-            setHttpPostForced(config.httpPostForced);
-
-            enableParameterTamperingProtectionInternal(config.tamperingProtectionSalt);
 
             if (config.eventQueueSizeThreshold != null) {
                 setEventQueueSizeToSend(config.eventQueueSizeThreshold);
@@ -553,119 +578,17 @@ public class Countly {
 
             checkIfDeviceIsAppCrawler();
 
-            boolean doingTemporaryIdMode = false;
-            boolean customIDWasProvided = (config.deviceID != null);
-            if (config.temporaryDeviceIdEnabled && !customIDWasProvided) {
-                //if we want to use temporary ID mode and no developer custom ID is provided
-                //then we override that custom ID to set the temporary mode
-                config.deviceID = DeviceId.temporaryCountlyDeviceId;
-                doingTemporaryIdMode = true;
-            }
-
-            DeviceId deviceIdInstance;
-            if (config.deviceID != null) {
-                //if the developer provided a ID
-                deviceIdInstance = new DeviceId(countlyStore, config.deviceID);
-            } else {
-                //the dev provided only a type, generate a appropriate ID
-                deviceIdInstance = new DeviceId(countlyStore, config.idMode);
-            }
-
-            if (isLoggingEnabled()) {
-                Log.d(Countly.TAG, "[Init] Currently cached advertising ID [" + countlyStore.getCachedAdvertisingId() + "]");
-            }
-            AdvertisingIdAdapter.cacheAdvertisingID(config.context, countlyStore);
-
-            deviceIdInstance.init(config.context, countlyStore, true);
-
-            boolean temporaryDeviceIdWasEnabled = deviceIdInstance.temporaryIdModeEnabled();
-            if (isLoggingEnabled()) {
-                Log.d(Countly.TAG, "[Init] [TemporaryDeviceId] Previously was enabled: [" + temporaryDeviceIdWasEnabled + "]");
-            }
-
-            if (temporaryDeviceIdWasEnabled) {
-                //if we previously we're in temporary ID mode
-
-                if (!config.temporaryDeviceIdEnabled || customIDWasProvided) {
-                    //if we don't set temporary device ID mode or
-                    //a custom device ID is explicitly provided
-                    //that means we have to exit temporary ID mode
-
-                    if (isLoggingEnabled()) {
-                        Log.d(Countly.TAG, "[Init] [TemporaryDeviceId] Decided we have to exit temporary device ID mode, mode enabled: [" + config.temporaryDeviceIdEnabled + "], custom Device ID Set: [" + customIDWasProvided + "]");
-                    }
-                } else {
-                    //we continue to stay in temporary ID mode
-                    //no changes need to happen
-
-                    if (isLoggingEnabled()) {
-                        Log.d(Countly.TAG, "[Init] [TemporaryDeviceId] Decided to stay in temporary ID mode");
-                    }
-                }
-            } else {
-                if (config.temporaryDeviceIdEnabled && config.deviceID == null) {
-                    //temporary device ID mode is enabled and
-                    //no custom device ID is provided
-                    //we can safely enter temporary device ID mode
-
-                    if (isLoggingEnabled()) {
-                        Log.d(Countly.TAG, "[Init] [TemporaryDeviceId] Decided to enter temporary ID mode");
-                    }
-                }
-            }
-
             //initialize networking queues
             connectionQueue_.setServerURL(config.serverURL);
             connectionQueue_.setAppKey(config.appKey);
             connectionQueue_.setCountlyStore(countlyStore);
-            connectionQueue_.setDeviceId(deviceIdInstance);
+            connectionQueue_.setDeviceId(config.deviceIdInstance);
             connectionQueue_.setRequestHeaderCustomValues(requestHeaderCustomValues);
             connectionQueue_.setMetricOverride(config.metricOverride);
             connectionQueue_.setContext(context_);
 
             eventQueue_ = new EventQueue(countlyStore);
-
-            if (doingTemporaryIdMode) {
-                if (isLoggingEnabled()) {
-                    Log.d(Countly.TAG, "[Init] Trying to enter temporary ID mode");
-                }
-                //if we are doing temporary ID, make sure it is applied
-                //if it's not, change ID to it
-                if (!deviceIdInstance.temporaryIdModeEnabled()) {
-                    if (isLoggingEnabled()) {
-                        Log.d(Countly.TAG, "[Init] Temporary ID mode was not enabled, entering it");
-                    }
-                    //temporary ID is not set
-                    changeDeviceId(DeviceId.temporaryCountlyDeviceId);
-                } else {
-                    if (isLoggingEnabled()) {
-                        Log.d(Countly.TAG, "[Init] Temporary ID mode was enabled previously, nothing to enter");
-                    }
-                }
-            }
-
-            //do star rating related things
-            if (getConsent(CountlyFeatureNames.starRating)) {
-                moduleRatings.registerAppSession(config.context, countlyStore, moduleRatings.starRatingCallback_);
-            }
-
-            //do location related things
-            if (config.disableLocation) {
-                disableLocation();
-            } else {
-                //if we are not disabling location, check for other set values
-                if (config.locationIpAddress != null || config.locationLocation != null || config.locationCity != null || config.locationCountyCode != null) {
-                    setLocation(config.locationCountyCode, config.locationCity, config.locationLocation, config.locationIpAddress);
-                }
-            }
-
-            //update remote config_ values if automatic update is enabled and we are not in temporary id mode
-            if (remoteConfigAutomaticUpdateEnabled && anyConsentGiven() && !doingTemporaryIdMode) {
-                if (isLoggingEnabled()) {
-                    Log.d(Countly.TAG, "[Init] Automatically updating remote config values");
-                }
-                moduleRemoteConfig.updateRemoteConfigValues(null, null, connectionQueue_, false, remoteConfigInitCallback);
-            }
+            //AFTER THIS POINT THE SDK IS COUNTED AS INITIALISED
 
             //set global application listeners
             if (config.application != null) {
@@ -760,16 +683,20 @@ public class Countly {
                     }
                 });
  */
+
+                for (ModuleBase module : modules) {
+                    module.initFinished(config);
+                }
+
+                if (isLoggingEnabled()) {
+                    Log.i(Countly.TAG, "[Init] Finished initialising SDK");
+                }
             }
         } else {
             //if this is not the first time we are calling init
 
             // context is allowed to be changed on the second init call
             connectionQueue_.setContext(context_);
-        }
-
-        for (ModuleBase module : modules) {
-            module.initFinished(config);
         }
 
         return this;
@@ -798,7 +725,7 @@ public class Countly {
         }
         eventQueue_ = null;
 
-        if(connectionQueue_ != null) {
+        if (connectionQueue_ != null) {
             final CountlyStore countlyStore = connectionQueue_.getCountlyStore();
             if (countlyStore != null) {
                 countlyStore.clear();
@@ -826,6 +753,8 @@ public class Countly {
         moduleConsent = null;
         moduleAPM = null;
         moduleDeviceId = null;
+        moduleLocation = null;
+        moduleFeedback = null;
 
         COUNTLY_SDK_VERSION_STRING = DEFAULT_COUNTLY_SDK_VERSION_STRING;
         COUNTLY_SDK_NAME = DEFAULT_COUNTLY_SDK_NAME;
@@ -1273,35 +1202,21 @@ public class Countly {
      * Disable sending of location data
      *
      * @return Returns link to Countly for call chaining
+     * @deprecated Use 'Countly.sharedInstance().location().disableLocation()'
      */
     public synchronized Countly disableLocation() {
         if (isLoggingEnabled()) {
             Log.d(Countly.TAG, "Disabling location");
         }
-
         if (!isInitialized()) {
             if (isLoggingEnabled()) {
-                Log.w(Countly.TAG, "The use of this before init is deprecated, use CountlyConfig instead of this");
+                Log.w(Countly.TAG, "The use of 'disableLocation' before init is deprecated, use CountlyConfig instead of this");
             }
         }
 
-        if (!getConsent(CountlyFeatureNames.location)) {
-            //can't send disable location request if no consent given
-            return this;
-        }
-
-        resetLocationValues();
-        connectionQueue_.getCountlyStore().setLocationDisabled(true);
-        connectionQueue_.sendLocation();
+        location().disableLocation();
 
         return this;
-    }
-
-    private synchronized void resetLocationValues() {
-        connectionQueue_.getCountlyStore().setLocationCountryCode(null);
-        connectionQueue_.getCountlyStore().setLocationCity(null);
-        connectionQueue_.getCountlyStore().setLocationGpsCoordinates(null);
-        connectionQueue_.getCountlyStore().setLocationIpAddress(null);
     }
 
     /**
@@ -1313,6 +1228,7 @@ public class Countly {
      * @param city Name of the user's city
      * @param gpsCoordinates comma separate lat and lng values. For example, "56.42345,123.45325"
      * @return Returns link to Countly for call chaining
+     * @deprecated Use 'Countly.sharedInstance().location().setLocation()'
      */
     public synchronized Countly setLocation(String country_code, String city, String gpsCoordinates, String ipAddress) {
         if (isLoggingEnabled()) {
@@ -1321,46 +1237,15 @@ public class Countly {
 
         if (!isInitialized()) {
             if (isLoggingEnabled()) {
-                Log.w(Countly.TAG, "The use of this before init is deprecated, use CountlyConfig instead of this");
+                Log.w(Countly.TAG, "The use of 'setLocation' before init is deprecated, use CountlyConfig instead of this");
             }
         }
 
-        if (!getConsent(CountlyFeatureNames.location)) {
-            return this;
-        }
-
-        if (country_code != null) {
-            connectionQueue_.getCountlyStore().setLocationCountryCode(country_code);
-        }
-
-        if (city != null) {
-            connectionQueue_.getCountlyStore().setLocationCity(city);
-        }
-
-        if (gpsCoordinates != null) {
-            connectionQueue_.getCountlyStore().setLocationGpsCoordinates(gpsCoordinates);
-        }
-
-        if (ipAddress != null) {
-            connectionQueue_.getCountlyStore().setLocationIpAddress(ipAddress);
-        }
-
-        if ((country_code == null && city != null) || (city == null && country_code != null)) {
-            if (isLoggingEnabled()) {
-                Log.w(Countly.TAG, "In \"setLocation\" both city and country code need to be set at the same time to be sent");
-            }
-        }
-
-        if (country_code != null || city != null || gpsCoordinates != null || ipAddress != null) {
-            connectionQueue_.getCountlyStore().setLocationDisabled(false);
-        }
-
-        if (isBeginSessionSent || !Countly.sharedInstance().getConsent(Countly.CountlyFeatureNames.sessions)) {
-            //send as a separate request if either begin session was already send and we missed our first opportunity
-            //or if consent for sessions is not given and our only option to send this is as a separate request
-            connectionQueue_.sendLocation();
+        if (isInitialized()) {
+            location().setLocation(country_code, city, gpsCoordinates, ipAddress);
         } else {
-            //will be sent a part of begin session
+            //use fallback
+            locationFallback = new String[] { country_code, city, gpsCoordinates, ipAddress };
         }
 
         return this;
@@ -2104,6 +1989,11 @@ public class Countly {
         if (!isInitialized()) {
             throw new IllegalStateException("init must be called before getDeviceID");
         }
+
+        if (isLoggingEnabled()) {
+            Log.d(Countly.TAG, "[Countly] Calling 'getDeviceID'");
+        }
+
         return connectionQueue_.getDeviceId().getId();
     }
 
@@ -2117,6 +2007,10 @@ public class Countly {
             throw new IllegalStateException("init must be called before getDeviceID");
         }
 
+        if (isLoggingEnabled()) {
+            Log.d(Countly.TAG, "[Countly] Calling 'getDeviceIDType'");
+        }
+
         return connectionQueue_.getDeviceId().getType();
     }
 
@@ -2127,7 +2021,7 @@ public class Countly {
      */
     public synchronized Countly setPushIntentAddMetadata(boolean shouldAddMetadata) {
         if (isLoggingEnabled()) {
-            Log.d(Countly.TAG, "Setting if adding metadata to push intents: [" + shouldAddMetadata + "]");
+            Log.d(Countly.TAG, "[Countly] Setting if adding metadata to push intents: [" + shouldAddMetadata + "]");
         }
         addMetadataToPushIntents = shouldAddMetadata;
         return this;
@@ -2190,8 +2084,8 @@ public class Countly {
      * Actions needed to be done for the consent related location erasure
      */
     void doLocationConsentSpecialErasure() {
-        resetLocationValues();
-        connectionQueue_.sendLocation();
+        moduleLocation.resetLocationValues();
+        connectionQueue_.sendLocation(true, null, null, null, null);
     }
 
     /**
@@ -2282,7 +2176,7 @@ public class Countly {
             return this;
         }
 
-        setConsent(groupedFeatures.get(groupName), isConsentGiven);
+        setConsentInternal(groupedFeatures.get(groupName), isConsentGiven);
 
         return this;
     }
@@ -2300,6 +2194,10 @@ public class Countly {
             Log.w(Countly.TAG, "[Countly] Calling 'setConsent' before initialising the SDK is deprecated!");
         }
 
+        return setConsentInternal(featureNames, isConsentGiven);
+    }
+
+    Countly setConsentInternal(String[] featureNames, boolean isConsentGiven) {
         final boolean isInit = isInitialized();//is the SDK initialized
 
         if (!requiresConsent) {
@@ -2307,7 +2205,7 @@ public class Countly {
             return this;
         }
 
-        if(featureNames == null) {
+        if (featureNames == null) {
             if (isLoggingEnabled()) {
                 Log.w(Countly.TAG, "[Countly] Calling setConsent with null featureNames!");
             }
@@ -2363,7 +2261,7 @@ public class Countly {
                     }
                     break;
                 case CountlyFeatureNames.apm:
-                    if(!isConsentGiven) {
+                    if (!isConsentGiven) {
                         //in case APM consent is removed, clear custom and network traces
                         moduleAPM.clearNetworkTraces();
                         moduleAPM.cancelAllTracesInternal();
@@ -2386,6 +2284,18 @@ public class Countly {
                     //if the first timing for a beginSession call was missed, send it again
                     if (!moduleSessions.manualSessionControlEnabled) {
                         moduleSessions.beginSessionInternal();
+                    }
+                }
+            }
+
+            //if consent was changed and set to false
+            if ((previousSessionsConsent != currentSessionConsent) && !currentSessionConsent) {
+                if (!isBeginSessionSent) {
+                    //if session consent was removed and first begins session was not sent
+                    //that means that we might not have sent the initially given location information
+
+                    if (moduleLocation.anyValidLocation()) {
+                        moduleLocation.sendCurrentLocation();
                     }
                 }
             }
@@ -2414,7 +2324,7 @@ public class Countly {
             Log.w(Countly.TAG, "[Countly] Calling 'giveConsent' before initialising the SDK is deprecated!");
         }
 
-        setConsent(featureNames, true);
+        setConsentInternal(featureNames, true);
 
         return this;
     }
@@ -2435,7 +2345,7 @@ public class Countly {
             Log.w(Countly.TAG, "Calling 'removeConsent' before initialising the SDK is deprecated!");
         }
 
-        setConsent(featureNames, false);
+        setConsentInternal(featureNames, false);
 
         return this;
     }
@@ -2476,21 +2386,7 @@ public class Countly {
         Boolean returnValue = featureConsentValues.get(featureName);
 
         if (returnValue == null) {
-            if (featureName.equals(CountlyFeatureNames.push)) {
-                //if the feature is 'push", set it with the value from preferences
-
-                boolean storedConsent = connectionQueue_.getCountlyStore().getConsentPush();
-
-                if (isLoggingEnabled()) {
-                    Log.d(Countly.TAG, "[Countly] Push consent has not been set this session. Setting the value found stored in preferences:[" + storedConsent + "]");
-                }
-
-                featureConsentValues.put(featureName, storedConsent);
-
-                returnValue = storedConsent;
-            } else {
-                returnValue = false;
-            }
+            returnValue = false;
         }
 
         if (isLoggingEnabled()) {
@@ -2587,7 +2483,7 @@ public class Countly {
      */
     public synchronized Countly setRemoteConfigAutomaticDownload(boolean enabled, final RemoteConfig.RemoteConfigCallback feedbackCallback) {
         if (isLoggingEnabled()) {
-            Log.d(Countly.TAG, "[Countly] Setting if remote config_ Automatic download will be enabled, " + enabled);
+            Log.d(Countly.TAG, "[Countly] Setting if remote config Automatic download will be enabled, " + enabled);
         }
 
         remoteConfigAutomaticUpdateEnabled = enabled;
@@ -2781,6 +2677,135 @@ public class Countly {
         connectionQueue_.tick();
     }
 
+    /**
+     * Go through the request queue and replace the appKey of all requests with the current appKey
+     */
+    synchronized public void requestQueueOverwriteAppKeys() {
+        if (isLoggingEnabled()) {
+            Log.i(Countly.TAG, "[Countly] Calling requestQueueOverwriteAppKeys");
+        }
+
+        if (!isInitialized()) {
+            if (isLoggingEnabled()) {
+                Log.e(Countly.TAG, "[Countly] Countly.sharedInstance().init must be called before requestQueueOverwriteAppKeys");
+            }
+            return;
+        }
+
+        List<String> filteredRequests = requestQueueReplaceWithAppKey(connectionQueue_.getCountlyStore().connections(), connectionQueue_.getAppKey());
+        if (filteredRequests != null) {
+            connectionQueue_.getCountlyStore().replaceConnectionsList(filteredRequests);
+            doStoredRequests();
+        }
+    }
+
+    /**
+     * Go through the request queue and delete all requests that don't have the current application key
+     */
+    synchronized public void requestQueueEraseAppKeysRequests() {
+        if (isLoggingEnabled()) {
+            Log.i(Countly.TAG, "[Countly] Calling requestQueueEraseAppKeysRequests");
+        }
+
+        if (!isInitialized()) {
+            if (isLoggingEnabled()) {
+                Log.e(Countly.TAG, "[Countly] Countly.sharedInstance().init must be called before requestQueueEraseAppKeysRequests");
+            }
+            return;
+        }
+
+        List<String> filteredRequests = requestQueueRemoveWithoutAppKey(connectionQueue_.getCountlyStore().connections(), connectionQueue_.getAppKey());
+        connectionQueue_.getCountlyStore().replaceConnectionsList(filteredRequests);
+        doStoredRequests();
+    }
+
+    synchronized List<String> requestQueueReplaceWithAppKey(String[] storedRequests, String targetAppKey) {
+        try {
+            List<String> filteredRequests = new ArrayList<>();
+
+            if (storedRequests == null || targetAppKey == null) {
+                //early abort
+                return filteredRequests;
+            }
+
+            String replacementPart = "app_key=" + UtilsNetworking.urlEncodeString(targetAppKey);
+
+            for (int a = 0; a < storedRequests.length; a++) {
+                if (storedRequests[a] == null) {
+                    continue;
+                }
+
+                boolean found = false;
+                String[] parts = storedRequests[a].split("&");
+
+                for (int b = 0; b < parts.length; b++) {
+                    if (parts[b].contains("app_key=")) {
+                        parts[b] = replacementPart;
+                        found = true;
+                        break;
+                    }
+                }
+
+                if (found) {
+                    //recombine and add
+                    StringBuilder stringBuilder = new StringBuilder(storedRequests[a].length());
+
+                    for (int c = 0; c < parts.length; c++) {
+                        if (c != 0) {
+                            stringBuilder.append("&");
+                        }
+                        stringBuilder.append(parts[c]);
+                    }
+                    filteredRequests.add(stringBuilder.toString());
+                } else {
+                    //pass through the old one
+                    filteredRequests.add(storedRequests[a]);
+                }
+            }
+
+            return filteredRequests;
+        } catch (Exception ex) {
+            //in case of failure, abort
+            if (isLoggingEnabled()) {
+                Log.e(Countly.TAG, "[Countly] Failed while overwriting appKeys, " + ex.toString());
+            }
+
+            return null;
+        }
+    }
+
+    synchronized List<String> requestQueueRemoveWithoutAppKey(String[] storedRequests, String targetAppKey) {
+        List<String> filteredRequests = new ArrayList<>();
+
+        if (storedRequests == null || targetAppKey == null) {
+            //early abort
+            return filteredRequests;
+        }
+
+        String searchablePart = "app_key=" + targetAppKey;
+
+        for (int a = 0; a < storedRequests.length; a++) {
+            if (storedRequests[a] == null) {
+                continue;
+            }
+
+            if (!storedRequests[a].contains(searchablePart)) {
+                if (isLoggingEnabled()) {
+                    Log.d(Countly.TAG, "[requestQueueEraseAppKeysRequests] Found a entry to remove: [" + storedRequests[a] + "]");
+                }
+            } else {
+                filteredRequests.add(storedRequests[a]);
+            }
+        }
+
+        return filteredRequests;
+    }
+
+    /**
+     * Go into temporary device ID mode
+     *
+     * @return
+     */
     public Countly enableTemporaryIdMode() {
         if (isLoggingEnabled()) {
             Log.i(Countly.TAG, "[Countly] Calling enableTemporaryIdMode");
@@ -2790,7 +2815,7 @@ public class Countly {
             throw new IllegalStateException("Countly.sharedInstance().init must be called before enableTemporaryIdMode");
         }
 
-        changeDeviceId(DeviceId.temporaryCountlyDeviceId);
+        moduleDeviceId.changeDeviceIdWithoutMerge(DeviceId.Type.TEMPORARY_ID, DeviceId.temporaryCountlyDeviceId);
 
         return this;
     }
@@ -2857,6 +2882,22 @@ public class Countly {
         }
 
         return moduleConsent.consentInterface;
+    }
+
+    public ModuleLocation.Location location() {
+        if (!isInitialized()) {
+            throw new IllegalStateException("Countly.sharedInstance().init must be called before accessing location");
+        }
+
+        return moduleLocation.locationInterface;
+    }
+
+    public ModuleFeedback.Feedback feedback() {
+        if (!isInitialized()) {
+            throw new IllegalStateException("Countly.sharedInstance().init must be called before accessing feedback");
+        }
+
+        return moduleFeedback.feedbackInterface;
     }
 
     public static void applicationOnCreate() {

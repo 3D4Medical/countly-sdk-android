@@ -22,26 +22,33 @@ THE SOFTWARE.
 package ly.count.android.sdk;
 
 import android.content.Context;
-
 import androidx.test.ext.junit.runners.AndroidJUnit4;
-
+import java.util.HashMap;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
-
-import java.util.HashMap;
-
-import static androidx.test.InstrumentationRegistry.getContext;
-
-import static org.junit.Assert.*;
-import static org.junit.Assert.assertNull;
-import static org.mockito.Mockito.*;
-
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.mockito.AdditionalMatchers;
-import org.mockito.ArgumentCaptor;
-import org.mockito.ArgumentMatchers;
+
+import static androidx.test.InstrumentationRegistry.getContext;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+import static org.mockito.Mockito.anyInt;
+import static org.mockito.Mockito.anyString;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyZeroInteractions;
+import static org.mockito.Mockito.when;
 
 @RunWith(AndroidJUnit4.class)
 public class CountlyTests {
@@ -156,7 +163,7 @@ public class CountlyTests {
     @Test
     public void testInit_nullDeviceID() {
         // null device ID is okay because it tells Countly to use OpenUDID
-       mUninitedCountly.init((new CountlyConfig(getContext(), "appkey", "http://test.count.ly")).setDeviceId(null));
+        mUninitedCountly.init((new CountlyConfig(getContext(), "appkey", "http://test.count.ly")).setDeviceId(null));
     }
 
     @Test
@@ -212,8 +219,7 @@ public class CountlyTests {
         try {
             mUninitedCountly.init((new CountlyConfig(getContext(), "appkey", "http://test2.count.ly")).setDeviceId("1234"));
             fail("expected IllegalStateException to be thrown when calling init a second time with different serverURL");
-        }
-        catch (IllegalStateException ignored) {
+        } catch (IllegalStateException ignored) {
             // success!
         }
     }
@@ -224,8 +230,7 @@ public class CountlyTests {
         try {
             mUninitedCountly.init((new CountlyConfig(getContext(), "appkey2", "http://test.count.ly")).setDeviceId("1234"));
             fail("expected IllegalStateException to be thrown when calling init a second time with different app key");
-        }
-        catch (IllegalStateException ignored) {
+        } catch (IllegalStateException ignored) {
             // success!
         }
     }
@@ -236,8 +241,7 @@ public class CountlyTests {
         try {
             mUninitedCountly.init((new CountlyConfig(getContext(), "appkey", "http://test.count.ly")).setDeviceId("4321"));
             fail("expected IllegalStateException to be thrown when calling init a second time with different device ID");
-        }
-        catch (IllegalStateException ignored) {
+        } catch (IllegalStateException ignored) {
             // success!
         }
     }
@@ -276,7 +280,6 @@ public class CountlyTests {
     public void testHalt() {
         CountlyStore mockCountlyStore = mock(CountlyStore.class);
 
-        when(mockCountlyStore.getLocationDisabled()).thenReturn(true);
         when(mockCountlyStore.getCachedAdvertisingId()).thenReturn("");
 
         mCountly.getConnectionQueue().setCountlyStore(mockCountlyStore);
@@ -297,7 +300,7 @@ public class CountlyTests {
         assertNotNull(mCountly.moduleRatings);
         assertNotNull(mCountly.moduleViews);
 
-        for(ModuleBase module:mCountly.modules){
+        for (ModuleBase module : mCountly.modules) {
             assertNotNull(module);
         }
 
@@ -342,7 +345,7 @@ public class CountlyTests {
         final long prevSessionDurationStartTime = mCountly.getPrevSessionDurationStartTime();
         assertTrue(prevSessionDurationStartTime > 0);
         assertTrue(prevSessionDurationStartTime <= System.nanoTime());
-        verify(mockConnectionQueue).beginSession();
+        verify(mockConnectionQueue).beginSession(false, null, null, null, null);
     }
 
     @Test
@@ -356,7 +359,7 @@ public class CountlyTests {
 
         assertEquals(2, mCountly.getActivityCount());
         assertEquals(prevSessionDurationStartTime, mCountly.getPrevSessionDurationStartTime());
-        verify(mockConnectionQueue).beginSession();
+        verify(mockConnectionQueue).beginSession(false, null, null, null, null);
     }
 
     @Test
@@ -633,8 +636,9 @@ public class CountlyTests {
         final EventQueue mockEventQueue = mock(EventQueue.class);
         mCountly.setEventQueue(mockEventQueue);
 
+        //create a spied countly class
         final Countly countly = spy(mCountly);
-        countly.moduleEvents._cly = countly;
+        countly.moduleEvents = new ModuleEvents(countly, countly.config_);
 
         doNothing().when(countly).sendEventsIfNeeded();
         doReturn(true).when(countly).isInitialized();

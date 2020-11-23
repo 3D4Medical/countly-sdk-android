@@ -1,12 +1,9 @@
 package ly.count.android.sdk.messaging;
 
 import android.util.Log;
-
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import ly.count.android.sdk.Countly;
 
 /**
  * Utility class
@@ -30,7 +27,7 @@ public class UtilsMessaging {
             Class.forName(cls);
             return true;
         } catch (ClassNotFoundException e) {
-            Log.d("Countly", "Class " + cls + " not found");
+            Log.d(Countly.TAG, "Class " + cls + " not found");
             return false;
         }
     }
@@ -50,7 +47,7 @@ public class UtilsMessaging {
 
     public Object _reflectiveCall(String className, Object instance, String methodName, Object... args) {
         try {
-            Log.d("Countly", "cls " + className + ", inst " + instance);
+            Log.d(Countly.TAG, "cls " + className + ", inst " + instance);
             className = className == null && instance != null ? instance.getClass().getName() : className;
             Class<?> cls = instance == null ? Class.forName(className) : instance.getClass();
             Class<?>[] types = null;
@@ -65,19 +62,20 @@ public class UtilsMessaging {
             Method method = cls.getDeclaredMethod(methodName, types);
             return method.invoke(instance, args);
         } catch (ClassNotFoundException t) {
-            Log.w("Countly", "Cannot call " + methodName + " of " + className, t);
+            Log.w(Countly.TAG, "Cannot call " + methodName + " of " + className, t);
             return false;
         } catch (NoSuchMethodException t) {
-            Log.w("Countly", "Cannot call " + methodName + " of " + className, t);
+            Log.w(Countly.TAG, "Cannot call " + methodName + " of " + className, t);
             return false;
         } catch (IllegalAccessException t) {
-            Log.w("Countly", "Cannot call " + methodName + " of " + className, t);
+            Log.w(Countly.TAG, "Cannot call " + methodName + " of " + className, t);
             return false;
         } catch (InvocationTargetException t) {
-            Log.w("Countly", "Cannot call " + methodName + " of " + className, t);
+            Log.w(Countly.TAG, "Cannot call " + methodName + " of " + className, t);
             return false;
         }
     }
+
     /**
      * Reflective method call encapsulation.
      *
@@ -93,9 +91,9 @@ public class UtilsMessaging {
 
     public Object _reflectiveCallStrict(String className, Object instance, String methodName, Object... arguments) {
         try {
-            Log.d("Countly", "cls " + className + ", inst " + instance);
+            Log.d(Countly.TAG, "cls " + className + ", inst " + instance);
             if (arguments != null && arguments.length % 2 != 0) {
-                Log.wtf("Countly", "wrong arguments passed to reflectiveCallStrict");
+                Log.wtf(Countly.TAG, "wrong arguments passed to reflectiveCallStrict");
                 return null;
             }
             className = className == null && instance != null ? instance.getClass().getName() : className;
@@ -112,16 +110,16 @@ public class UtilsMessaging {
             Method method = cls.getDeclaredMethod(methodName, types);
             return method.invoke(instance, args);
         } catch (ClassNotFoundException t) {
-            Log.w("Countly", "Cannot call " + methodName + " of " + className, t);
+            Log.w(Countly.TAG, "Cannot call " + methodName + " of " + className, t);
             return false;
         } catch (NoSuchMethodException t) {
-            Log.w("Countly", "Cannot call " + methodName + " of " + className, t);
+            Log.w(Countly.TAG, "Cannot call " + methodName + " of " + className, t);
             return false;
         } catch (IllegalAccessException t) {
-            Log.w("Countly", "Cannot call " + methodName + " of " + className, t);
+            Log.w(Countly.TAG, "Cannot call " + methodName + " of " + className, t);
             return false;
         } catch (InvocationTargetException t) {
-            Log.w("Countly", "Cannot call " + methodName + " of " + className, t);
+            Log.w(Countly.TAG, "Cannot call " + methodName + " of " + className, t);
             return false;
         }
     }

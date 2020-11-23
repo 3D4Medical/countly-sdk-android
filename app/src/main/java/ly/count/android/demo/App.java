@@ -21,9 +21,7 @@ import com.google.android.gms.tasks.Task;
 import com.google.firebase.iid.FirebaseInstanceId;
 import com.google.firebase.iid.InstanceIdResult;
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import ly.count.android.sdk.Countly;
@@ -34,6 +32,7 @@ import ly.count.android.sdk.RemoteConfig;
 import ly.count.android.sdk.messaging.CountlyPush;
 
 import static ly.count.android.sdk.Countly.TAG;
+import static ly.count.android.sdk.messaging.CountlyPush.COUNTLY_BROADCAST_PERMISSION_POSTFIX;
 
 public class App extends Application {
     /** You should use try.count.ly instead of YOUR_SERVER for the line below if you are using Countly trial service */
@@ -108,8 +107,6 @@ public class App extends Application {
                 + "PTJ7eeMmX9g/0h"
         };
 
-        Context appC = getApplicationContext();
-
         HashMap<String, String> customHeaderValues = new HashMap<>();
         customHeaderValues.put("foo", "bar");
 
@@ -123,13 +120,13 @@ public class App extends Application {
         metricOverride.put("_carrier", "BoneyK");
 
         Countly.sharedInstance().setLoggingEnabled(true);
-        CountlyConfig config = (new CountlyConfig(appC, COUNTLY_APP_KEY, COUNTLY_SERVER_URL)).setIdMode(DeviceId.Type.OPEN_UDID)
-            //.enableTemporaryDeviceIdMode()
-            .enableCrashReporting().setLoggingEnabled(true).enableCrashReporting().setViewTracking(true).setAutoTrackingUseShortName(true)
+        CountlyConfig config = (new CountlyConfig(this, COUNTLY_APP_KEY, COUNTLY_SERVER_URL)).setIdMode(DeviceId.Type.OPEN_UDID)//.setDeviceId("67567")
+            .enableCrashReporting().setLoggingEnabled(true).enableCrashReporting().setViewTracking(true).setAutoTrackingUseShortName(true)//.enableTemporaryDeviceIdMode()
             .setRequiresConsent(true).setConsentEnabled(new String[] {
-                Countly.CountlyFeatureNames.push, Countly.CountlyFeatureNames.sessions,
-                Countly.CountlyFeatureNames.location, Countly.CountlyFeatureNames.attribution, Countly.CountlyFeatureNames.crashes, Countly.CountlyFeatureNames.events,
-                Countly.CountlyFeatureNames.starRating, Countly.CountlyFeatureNames.users, Countly.CountlyFeatureNames.views, Countly.CountlyFeatureNames.apm
+                Countly.CountlyFeatureNames.push, Countly.CountlyFeatureNames.sessions, Countly.CountlyFeatureNames.location,
+                Countly.CountlyFeatureNames.attribution, Countly.CountlyFeatureNames.crashes, Countly.CountlyFeatureNames.events,
+                Countly.CountlyFeatureNames.starRating, Countly.CountlyFeatureNames.users, Countly.CountlyFeatureNames.views,
+                Countly.CountlyFeatureNames.apm, Countly.CountlyFeatureNames.remoteConfig, Countly.CountlyFeatureNames.feedback
             })
             .addCustomNetworkRequestHeaders(customHeaderValues).setPushIntentAddMetadata(true).setRemoteConfigAutomaticDownload(true, new RemoteConfig.RemoteConfigCallback() {
                 @Override
@@ -152,14 +149,13 @@ public class App extends Application {
                     return crash.contains("crash");
                 }
             })
-            .setApplication(this)
             .setRecordAppStartTime(true)
             .setHttpPostForced(false)
             //.enableCertificatePinning(certificates)
             //.enablePublicKeyPinning(certificates)
 
             //.setDisableLocation()
-            .setLocation("us", "Boston", "-23.8043604,-46.6718331", "10.2.33.12")
+            .setLocation("us", "Böston", "-23.8043604,-46.6718331", "10.2.33.12")
             //.setMetricOverride(metricOverride)
             .setEnableAttribution(true);
 
@@ -210,7 +206,7 @@ public class App extends Application {
             }
         };
         IntentFilter filter = new IntentFilter();
-        filter.addAction(CountlyPush.NOTIFICATION_BROADCAST);
-        registerReceiver(messageReceiver, filter);
+        filter.addAction(CountlyPush.SECURE_NOTIFICATION_BROADCAST);
+        registerReceiver(messageReceiver, filter, getPackageName() + COUNTLY_BROADCAST_PERMISSION_POSTFIX, null);
     }
 }

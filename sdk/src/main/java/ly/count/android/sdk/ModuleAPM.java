@@ -2,13 +2,9 @@ package ly.count.android.sdk;
 
 import android.app.Activity;
 import android.util.Log;
-
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 public class ModuleAPM extends ModuleBase {
 
@@ -115,7 +111,7 @@ public class ModuleAPM extends ModuleBase {
             return;
         }
 
-        if(!codeTraces.containsKey(traceKey)) {
+        if (!codeTraces.containsKey(traceKey)) {
             if (_cly.isLoggingEnabled()) {
                 Log.w(Countly.TAG, "[ModuleAPM] no trace with key [" + traceKey + "] found");
             }
@@ -207,14 +203,14 @@ public class ModuleAPM extends ModuleBase {
     }
 
     String validateAndModifyTraceKey(String traceKey) {
-        if(traceKey.charAt(0) == '$' && _cly.isLoggingEnabled()) {
+        if (traceKey.charAt(0) == '$' && _cly.isLoggingEnabled()) {
             Log.w(Countly.TAG, "[ModuleAPM] validateAndModifyTraceKey, trace keys can't start with '$', it will be removed server side");
         }
 
-        if(traceKey.length() > 2048) {
+        if (traceKey.length() > 2048) {
             traceKey = traceKey.substring(0, 2047);
 
-            if(_cly.isLoggingEnabled()) {
+            if (_cly.isLoggingEnabled()) {
                 Log.w(Countly.TAG, "[ModuleAPM] validateAndModifyTraceKey, trace keys can't be longer than 2048 characters, it will be trimmed down");
             }
         }
@@ -347,7 +343,7 @@ public class ModuleAPM extends ModuleBase {
             responsePayloadSize = 0;
         }
 
-        if(startTimestamp > endTimestamp) {
+        if (startTimestamp > endTimestamp) {
             if (_cly.isLoggingEnabled()) {
                 Log.e(Countly.TAG, "[ModuleAPM] End timestamp is smaller than start timestamp, switching values");
             }
@@ -390,6 +386,10 @@ public class ModuleAPM extends ModuleBase {
     void calculateAppRunningTimes(int previousCount, int newCount) {
         boolean goingToBackground = (previousCount == 1 && newCount == 0);
         boolean goingToForeground = (previousCount == 0 && newCount == 1);
+
+        if (_cly.isLoggingEnabled()) {
+            Log.v(Countly.TAG, "[ModuleAPM] calculateAppRunningTimes, toBG[" + goingToBackground + "] toFG[" + goingToForeground + "]");
+        }
 
         if (goingToBackground || goingToForeground) {
             long currentTimeMs = UtilsTime.currentTimestampMs();
@@ -464,11 +464,13 @@ public class ModuleAPM extends ModuleBase {
          * @param traceKey key by which this action is identified
          */
         public void startTrace(String traceKey) {
-            if (_cly.isLoggingEnabled()) {
-                Log.i(Countly.TAG, "[Apm] Calling 'startTrace' with key:[" + traceKey + "]");
-            }
+            synchronized (_cly) {
+                if (_cly.isLoggingEnabled()) {
+                    Log.i(Countly.TAG, "[Apm] Calling 'startTrace' with key:[" + traceKey + "]");
+                }
 
-            startTraceInternal(traceKey);
+                startTraceInternal(traceKey);
+            }
         }
 
         /**
@@ -477,28 +479,34 @@ public class ModuleAPM extends ModuleBase {
          * @param traceKey key by which this action is identified
          */
         public void endTrace(String traceKey, Map<String, Integer> customMetrics) {
-            if (_cly.isLoggingEnabled()) {
-                Log.i(Countly.TAG, "[Apm] Calling 'endTrace' with key:[" + traceKey + "]");
-            }
+            synchronized (_cly) {
+                if (_cly.isLoggingEnabled()) {
+                    Log.i(Countly.TAG, "[Apm] Calling 'endTrace' with key:[" + traceKey + "]");
+                }
 
-            endTraceInternal(traceKey, customMetrics);
+                endTraceInternal(traceKey, customMetrics);
+            }
         }
 
         public void cancelTrace(String traceKey) {
-            if (_cly.isLoggingEnabled()) {
-                Log.i(Countly.TAG, "[Apm] Calling 'cancelTrace' with key:[" + traceKey + "]");
-            }
+            synchronized (_cly) {
+                if (_cly.isLoggingEnabled()) {
+                    Log.i(Countly.TAG, "[Apm] Calling 'cancelTrace' with key:[" + traceKey + "]");
+                }
 
-            cancelTraceInternal(traceKey);
+                cancelTraceInternal(traceKey);
+            }
         }
 
         public void cancelAllTraces() {
-            if (_cly.isLoggingEnabled()) {
-                Log.i(Countly.TAG, "[Apm] Calling 'cancelAllTraces'");
-            }
+            synchronized (_cly) {
+                if (_cly.isLoggingEnabled()) {
+                    Log.i(Countly.TAG, "[Apm] Calling 'cancelAllTraces'");
+                }
 
-            cancelAllTracesInternal();
-            clearNetworkTraces();
+                cancelAllTracesInternal();
+                clearNetworkTraces();
+            }
         }
 
         /**
@@ -509,11 +517,13 @@ public class ModuleAPM extends ModuleBase {
          * for the same trace. This helps to distinguish them.
          */
         public void startNetworkRequest(String networkTraceKey, String uniqueId) {
-            if (_cly.isLoggingEnabled()) {
-                Log.i(Countly.TAG, "[Apm] Calling 'startNetworkRequest' with key:[" + networkTraceKey + "], uniqueID:[" + uniqueId + "]");
-            }
+            synchronized (_cly) {
+                if (_cly.isLoggingEnabled()) {
+                    Log.i(Countly.TAG, "[Apm] Calling 'startNetworkRequest' with key:[" + networkTraceKey + "], uniqueID:[" + uniqueId + "]");
+                }
 
-            startNetworkRequestInternal(networkTraceKey, uniqueId);
+                startNetworkRequestInternal(networkTraceKey, uniqueId);
+            }
         }
 
         /**
@@ -527,11 +537,13 @@ public class ModuleAPM extends ModuleBase {
          * @param responsePayloadSize received response payload size in bytes
          */
         public void endNetworkRequest(String networkTraceKey, String uniqueId, int responseCode, int requestPayloadSize, int responsePayloadSize) {
-            if (_cly.isLoggingEnabled()) {
-                Log.i(Countly.TAG, "[Apm] Calling 'endNetworkRequest' with key:[" + networkTraceKey + "], uniqueID:[" + uniqueId + "]");
-            }
+            synchronized (_cly) {
+                if (_cly.isLoggingEnabled()) {
+                    Log.i(Countly.TAG, "[Apm] Calling 'endNetworkRequest' with key:[" + networkTraceKey + "], uniqueID:[" + uniqueId + "]");
+                }
 
-            endNetworkRequestInternal(networkTraceKey, uniqueId, responseCode, requestPayloadSize, responsePayloadSize);
+                endNetworkRequestInternal(networkTraceKey, uniqueId, responseCode, requestPayloadSize, responsePayloadSize);
+            }
         }
 
         /**
@@ -545,11 +557,13 @@ public class ModuleAPM extends ModuleBase {
          * @param requestEndTimestampMs network request end timestamp in milliseconds
          */
         public void recordNetworkTrace(String networkTraceKey, int responseCode, int requestPayloadSize, int responsePayloadSize, long requestStartTimestampMs, long requestEndTimestampMs) {
-            if (_cly.isLoggingEnabled()) {
-                Log.i(Countly.TAG, "[Apm] Calling 'recordNetworkTrace' with key:[" + networkTraceKey + "]");
-            }
+            synchronized (_cly) {
+                if (_cly.isLoggingEnabled()) {
+                    Log.i(Countly.TAG, "[Apm] Calling 'recordNetworkTrace' with key:[" + networkTraceKey + "]");
+                }
 
-            recordNetworkRequestInternal(networkTraceKey, responseCode, requestPayloadSize, responsePayloadSize, requestStartTimestampMs, requestEndTimestampMs);
+                recordNetworkRequestInternal(networkTraceKey, responseCode, requestPayloadSize, responsePayloadSize, requestStartTimestampMs, requestEndTimestampMs);
+            }
         }
     }
 }

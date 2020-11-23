@@ -36,10 +36,6 @@ import android.os.Build;
 import android.os.Environment;
 import android.os.StatFs;
 import android.util.Log;
-
-import org.json.JSONException;
-import org.json.JSONObject;
-
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -48,6 +44,8 @@ import java.util.LinkedList;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 /**
  * This class provides several static methods to retrieve information about
@@ -193,13 +191,13 @@ class CrashDetails {
      * Get custom segments json string
      */
     static JSONObject getCustomSegmentsJson(final Map<String, Object> additionalCustomSegmentation) {
-        if(additionalCustomSegmentation == null && (customSegments == null || customSegments.isEmpty())) {
+        if (additionalCustomSegmentation == null && (customSegments == null || customSegments.isEmpty())) {
             return null;
         }
 
         JSONObject returnedSegmentation = new JSONObject();
 
-        if(customSegments != null) {
+        if (customSegments != null) {
             for (String k : customSegments.keySet()) {
                 if (k != null) {
                     try {
@@ -213,7 +211,7 @@ class CrashDetails {
             }
         }
 
-        if(additionalCustomSegmentation != null) {
+        if (additionalCustomSegmentation != null) {
             for (String k : additionalCustomSegmentation.keySet()) {
                 if (k != null) {
                     try {

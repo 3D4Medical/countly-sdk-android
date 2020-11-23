@@ -4,7 +4,7 @@
     <string name="app_name">Countly Demo App</string>
     <string name="deep_link">Deep Link Test</string>
     <string name="countly_hannel_name">General Notifications</string>
-    <string name="countly_channel_description"><![CDATA[News & announcements from AppMessagingFcm]]></string>
+    <string name="countly_channel_description"><![CDATA[News & announcements]]></string>
     <string name="title_activity_another">AnotherActivity</string>
     <string name="another_activity_text">Another Activity</string>
 
@@ -64,5 +64,6 @@
     <string name="remove_exception">remove exception</string>
     <string name="manual_report">manual report</string>
     <string name="add_a_breadcrumb">Add a breadcrumb</string>
+    <string name="activity_name_feedback">Feedback examples</string>
 
 </resources>
